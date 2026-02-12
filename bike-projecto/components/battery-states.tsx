@@ -72,7 +72,7 @@ export function EmptyBatteryState() {
         <div className="liquid-glass-pill mt-6 flex items-center gap-2 rounded-full px-4 py-2">
           <WifiOff className="h-4 w-4 text-muted-foreground" />
           <span className="font-mono text-xs text-muted-foreground">
-            Endpoint: {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'}/api/battery
+            Endpoint: {process.env.NEXT_PUBLIC_API_URL || 'https://bike.xaviergalarreta.pro'}/api/battery
           </span>
         </div>
       </div>
