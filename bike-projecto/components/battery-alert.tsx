@@ -67,14 +67,16 @@ export function BatteryAlert({ data }: BatteryAlertProps) {
     )
   }
 
-  // Sobrevoltaje
-  if (voltage > 42) {
+  // Sobrevoltaje - Solo alertar si es peligroso
+  // Durante carga normal el cargador entrega 42V, esto es correcto
+  // Solo alertar si: voltage > 42.5V O (voltage > 42V y NO está cargando)
+  if (voltage > 42.5 || (voltage > 42 && !charging)) {
     return (
       <Alert className="border-red-500/50 bg-red-500/10">
         <XCircle className="h-5 w-5 text-red-500" />
         <AlertTitle className="text-red-500">¡PELIGRO! Sobrevoltaje Detectado</AlertTitle>
         <AlertDescription className="text-red-300/80">
-          Voltaje: {voltage.toFixed(2)}V excede el límite seguro de 42V. <strong>DESCONECTA el cargador INMEDIATAMENTE</strong>.
+          Voltaje: {voltage.toFixed(2)}V excede el límite seguro. <strong>DESCONECTA el cargador INMEDIATAMENTE</strong>.
         </AlertDescription>
       </Alert>
     )

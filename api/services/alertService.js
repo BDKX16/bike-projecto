@@ -20,6 +20,17 @@ const transporter = nodemailer.createTransport(
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD
+    },
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
+    rateDelta: 1000,
+    rateLimit: 5,
+    connectionTimeout: 60000,
+    greetingTimeout: 30000,
+    socketTimeout: 60000,
+    tls: {
+      rejectUnauthorized: false
     }
   } : {
     // Gmail por defecto
@@ -27,9 +38,34 @@ const transporter = nodemailer.createTransport(
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD
+    },
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
+    rateDelta: 1000,
+    rateLimit: 5,
+    connectionTimeout: 60000,
+    greetingTimeout: 30000,
+    socketTimeout: 60000,
+    tls: {
+      rejectUnauthorized: false
     }
   }
 );
+
+// Verificar configuración del transporter al iniciar
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('❌ Error en configuración de email:', error.message);
+    console.error('💡 Verifica:');
+    console.error('   1. EMAIL_USER está configurado correctamente');
+    console.error('   2. EMAIL_PASSWORD es una "App Password" de Gmail (no tu contraseña normal)');
+    console.error('   3. La verificación en 2 pasos está activada en tu cuenta de Gmail');
+    console.error('   4. Genera App Password en: https://myaccount.google.com/apppasswords');
+  } else {
+    console.log('✅ Servicio de email configurado correctamente');
+  }
+});
 
 // Verificar si se puede enviar una alerta (throttling)
 async function canSendAlert(alertType) {
@@ -105,11 +141,14 @@ function analyzeBatteryStatus(data) {
   }
 
   // Sobrevoltaje (> 42V = 4.2V por celda)
-  if (voltage > 42) {
+  // Durante la carga es normal llegar a 42V, solo alertar si:
+  // - Voltaje > 42.5V (sobrecarga peligrosa), O
+  // - Voltaje > 42V y NO está cargando (indica problema en BMS)
+  if (voltage > 42.5 || (voltage > 42 && !charging)) {
     alerts.push({
       level: 'CRÍTICO',
       issue: 'Sobrevoltaje detectado',
-      detail: `${voltage.toFixed(2)}V - Excede el límite seguro de 42V`,
+      detail: `${voltage.toFixed(2)}V - Excede el límite seguro`,
       action: '⚠️ DESCONECTA el cargador INMEDIATAMENTE. Verifica el BMS y el cargador.'
     });
   }
@@ -261,6 +300,9 @@ async function sendAlertEmail(data, alerts) {
 
 // Enviar email de carga completa
 async function sendChargeCompleteEmail(data) {
+  console.log('📧 Preparando email de carga completa...');
+  console.log('📊 Datos recibidos:', JSON.stringify(data, null, 2));
+  
   // Verificar throttling para carga completa
   const canSend = await canSendAlert('charge_complete');
   if (!canSend) {
@@ -269,6 +311,7 @@ async function sendChargeCompleteEmail(data) {
   }
 
   const { device, voltage, percent, cycles } = data;
+  console.log(`📋 Preparando email para: ${device} - ${voltage}V - ${percent}% - ${cycles} ciclos`);
 
   const subject = `✅ Carga Completa - ${device}`;
 
@@ -314,16 +357,28 @@ async function sendChargeCompleteEmail(data) {
     html
   };
 
+  console.log('📮 Opciones de email configuradas:');
+  console.log(`   From: ${mailOptions.from}`);
+  console.log(`   To: ${mailOptions.to}`);
+  console.log(`   Subject: ${mailOptions.subject}`);
+  console.log('🚀 Intentando enviar email...');
+
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✉️ Email de carga completa enviado: ${info.messageId}`);
+    console.log(`✉️ Email de carga completa enviado exitosamente!`);
+    console.log(`   Message ID: ${info.messageId}`);
+    console.log(`   Response: ${info.response}`);
     
     // Registrar que se envió la alerta
     await logAlert('charge_complete');
     
     return info;
   } catch (error) {
-    console.error('❌ Error enviando email de carga completa:', error);
+    console.error('❌ Error enviando email de carga completa:');
+    console.error('   Error name:', error.name);
+    console.error('   Error message:', error.message);
+    console.error('   Error code:', error.code);
+    console.error('   Error stack:', error.stack);
     throw error;
   }
 }
