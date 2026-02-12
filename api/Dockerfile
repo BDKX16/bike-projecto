@@ -1,16 +1,22 @@
 FROM node:18-alpine
 
-WORKDIR /api
+WORKDIR /app
 
-COPY package.json .
+# Copiar archivos de dependencias
+COPY package.json package-lock.json* ./
 
-RUN npm install
+# Instalar dependencias
+RUN npm ci --only=production
 
+# Copiar código fuente
 COPY . .
 
-
+# Exponer puerto
 EXPOSE 3001
 
-# Usar script de inicialización que verifica OpenSSL
+# Variable de entorno
+ENV NODE_ENV=production
+
+# Iniciar aplicación
 CMD ["node", "index.js"]
 

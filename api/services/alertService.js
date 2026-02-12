@@ -10,13 +10,26 @@ const ALERT_COOLDOWN = {
 };
 
 // Configurar transportador de email
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
+// Soporta tanto Gmail como SMTP personalizado
+const transporter = nodemailer.createTransport(
+  process.env.SMTP_HOST ? {
+    // SMTP personalizado
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true', // true para 465, false para otros puertos
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD
+    }
+  } : {
+    // Gmail por defecto
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD
+    }
   }
-});
+);
 
 // Verificar si se puede enviar una alerta (throttling)
 async function canSendAlert(alertType) {
