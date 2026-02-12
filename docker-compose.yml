@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # Backend API
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: bike-api
+    restart: unless-stopped
+    ports:
+      - "3120:3000"
+    environment:
+      NODE_ENV: production
+
+    networks:
+      - default
+      - shared-network  # Red externa donde está MongoDB
+    volumes:
+      - ./api/logs:/app/logs
+
+  # Frontend Next.js
+  frontend:
+    build:
+      context: ./bike-projecto
+      dockerfile: Dockerfile
+    container_name: bike-frontend
+    restart: unless-stopped
+    ports:
+      - "3121:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3120}
+    depends_on:
+      - api
+    # Usa la red por defecto (no es necesario declarar)
+
+networks:
+  shared-network:
+    external: true
+    name: shared-network
