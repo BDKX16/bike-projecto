@@ -9,7 +9,7 @@ services:
     container_name: bike-api
     restart: unless-stopped
     ports:
-      - "3120:3000"
+      - "3120:3001"
     environment:
       NODE_ENV: production
       API_PORT: 3001
