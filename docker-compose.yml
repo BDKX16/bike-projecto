@@ -12,7 +12,21 @@ services:
       - "3120:3000"
     environment:
       NODE_ENV: production
-
+      API_PORT: 3001
+      # MongoDB - Configurar según tu setup existente
+      MONGO_USERNAME: ${MONGO_USERNAME:-admin}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_HOST: ${MONGO_HOST:-mongo}
+      MONGO_PORT: ${MONGO_PORT:-27017}
+      MONGO_DATABASE: ${MONGO_DATABASE:-bike_projecto}
+      # Email - Gmail o SMTP personalizado
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      ALERT_EMAIL: ${ALERT_EMAIL:-xgalarreta.dev@gmail.com}
+      # SMTP personalizado (opcional, comentar si usas Gmail)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
     networks:
       - default
       - shared-network  # Red externa donde está MongoDB

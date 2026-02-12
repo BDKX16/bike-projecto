@@ -15,9 +15,18 @@ app.use(cors());
 // MongoDB Connection
 const mongoUri = `mongodb://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@${process.env.MONGO_HOST}:${process.env.MONGO_PORT}/${process.env.MONGO_DATABASE}?authSource=admin`;
 
+console.log('🔍 MongoDB URI:', mongoUri.replace(/\/\/.*:.*@/, '//*****:*****@')); // Log con password oculto
+
 mongoose.connect(mongoUri)
   .then(() => console.log("✅ MongoDB conectado"))
-  .catch(err => console.error("❌ Error conectando a MongoDB:", err));
+  .catch(err => {
+    console.error("❌ Error conectando a MongoDB:", err.message);
+    console.error("💡 Verifica las variables de entorno:");
+    console.error(`   MONGO_HOST: ${process.env.MONGO_HOST}`);
+    console.error(`   MONGO_PORT: ${process.env.MONGO_PORT}`);
+    console.error(`   MONGO_USERNAME: ${process.env.MONGO_USERNAME}`);
+    console.error(`   MONGO_DATABASE: ${process.env.MONGO_DATABASE}`);
+  });
 
 // Endpoints
 
