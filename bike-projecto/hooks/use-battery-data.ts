@@ -15,8 +15,17 @@ export function useBatteryData(refreshInterval: number = 60000): UseBatteryDataR
 
   const fetchData = async () => {
     try {
+      // En producción, usar la misma URL (relativa)
+      // En desarrollo, usar localhost
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'
-      const response = await fetch(`${apiUrl}/api/bike-data/latest`)
+      
+      // Si estamos en el navegador y la URL contiene el dominio de producción, usar ruta relativa
+      const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      const endpoint = isDevelopment ? `${apiUrl}/api/bike-data/latest` : '/api/bike-data/latest'
+      
+      console.log('Fetching from:', endpoint)
+      
+      const response = await fetch(endpoint)
       
       if (!response.ok) {
         if (response.status === 404) {
