@@ -3,6 +3,7 @@
 import { ChevronDown, Zap } from "lucide-react"
 import { BatteryGauge } from "./battery-gauge"
 import { BatteryStats } from "./battery-stats"
+import { BatteryAlert } from "./battery-alert"
 import type { BikeData } from "@/lib/bike-data"
 
 interface HeroSectionProps {
@@ -26,15 +27,20 @@ export function HeroSection({ data }: HeroSectionProps) {
         <div className="mb-2 flex items-center gap-2">
           <Zap className="h-5 w-5 text-primary" />
           <span className="font-mono text-xs font-bold uppercase tracking-[0.3em] text-primary">
-            Confi Bike
+            {data.device}
           </span>
         </div>
         <h1 className="text-balance text-center text-2xl font-bold tracking-tight text-foreground md:text-3xl">
-          Estado de Bateria
+          Estado de Batería
         </h1>
         <p className="mt-2 text-center text-sm text-muted-foreground">
-          Telemetria en tiempo real
+          Telemetría en tiempo real
         </p>
+      </div>
+
+      {/* Alert - Solo si hay alguna alerta que mostrar */}
+      <div className="relative z-10 mb-6 w-full max-w-2xl">
+        <BatteryAlert data={data} />
       </div>
 
       {/* Battery Gauge */}
@@ -42,7 +48,7 @@ export function HeroSection({ data }: HeroSectionProps) {
         <BatteryGauge
           percentage={data.percent}
           charging={data.charging}
-          name={data.name}
+          name={data.name || data.device}
         />
       </div>
 
@@ -64,10 +70,14 @@ export function HeroSection({ data }: HeroSectionProps) {
         <span className="font-mono text-xs tracking-wider text-muted-foreground">
           {data.charging ? "Cargando" : "En uso"}
         </span>
-        <span className="h-3 w-px bg-border" />
-        <span className="font-mono text-xs text-muted-foreground">
-          {data.remainingAh.toFixed(2)} / {(data.remainingAh + data.consumedAh).toFixed(2)} Ah
-        </span>
+        {data.remainingAh !== undefined && data.consumedAh !== undefined && (
+          <>
+            <span className="h-3 w-px bg-border" />
+            <span className="font-mono text-xs text-muted-foreground">
+              {data.remainingAh.toFixed(2)} / {(data.remainingAh + data.consumedAh).toFixed(2)} Ah
+            </span>
+          </>
+        )}
       </div>
 
       {/* Scroll indicator */}

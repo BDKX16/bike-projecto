@@ -30,7 +30,7 @@ services:
       - "3121:3000"
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3120}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://bike.xaviergalarreta.pro/api}
     depends_on:
       - api
     # Usa la red por defecto (no es necesario declarar)

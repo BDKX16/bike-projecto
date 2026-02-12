@@ -1,0 +1,39 @@
+name: Deploy App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d_%H:%M:%S')" >> $GITHUB_OUTPUT
+
+      - name: "Deploy to server"
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            cd /srv/bike-projecto
+
+            # Detener contenedores actuales
+            docker compose down
+
+            # Actualizar código
+            git pull origin main
+
+            # Construir y levantar con caché (más eficiente)
+            docker compose up -d --build
+
+            # Limpiar imágenes huérfanas solo si es necesario
+            docker image prune -f

@@ -1,13 +1,13 @@
 export interface BikeData {
   device: string
-  name: string
+  name?: string
   voltage: number
   current: number
   percent: number
-  remainingAh: number
-  consumedAh: number
+  remainingAh?: number
+  consumedAh?: number
   cycles: number
-  maxCycles: number
+  maxCycles?: number
   charging: boolean
   timestamp: number
 }

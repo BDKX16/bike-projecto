@@ -41,18 +41,27 @@ export function BatteryGauge({ percentage, charging, name }: BatteryGaugeProps) 
   const strokeDashoffset = circumference - (animatedPercentage / 100) * circumference
 
   const getColor = () => {
-    if (charging) return "hsl(160, 80%, 48%)"
-    if (percentage > 60) return "hsl(199, 89%, 48%)"
-    if (percentage > 30) return "hsl(45, 90%, 55%)"
-    return "hsl(0, 80%, 55%)"
+    // Batería cargando
+    if (charging) {
+      if (percentage >= 99.5) return "hsl(120, 70%, 50%)" // Verde cuando está completa
+      return "hsl(160, 80%, 48%)" // Azul-verde cuando está cargando
+    }
+    
+    // Batería en uso
+    if (percentage >= 60) return "hsl(199, 89%, 48%)" // Azul - Buena
+    if (percentage >= 40) return "hsl(45, 90%, 55%)" // Amarillo - Media
+    if (percentage >= 15) return "hsl(25, 90%, 55%)" // Naranja - Baja
+    return "hsl(0, 80%, 55%)" // Rojo - Crítica
   }
 
   const getLabel = () => {
+    if (charging && percentage >= 99.5) return "Completa"
     if (charging) return "Cargando"
-    if (percentage > 80) return "Excelente"
-    if (percentage > 60) return "Buena"
-    if (percentage > 30) return "Media"
-    return "Baja"
+    if (percentage >= 80) return "Excelente"
+    if (percentage >= 60) return "Buena"
+    if (percentage >= 40) return "Media"
+    if (percentage >= 15) return "Baja"
+    return "¡Crítica!"
   }
 
   return (
