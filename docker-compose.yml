@@ -8,6 +8,8 @@ services:
       dockerfile: Dockerfile
     container_name: bike-api
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "3120:3001"
     environment:

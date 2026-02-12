@@ -66,6 +66,12 @@ console.log(`   Secure: ${isSecurePort || process.env.SMTP_SECURE === 'true'}`);
 console.log(`   User: ${process.env.EMAIL_USER}`);
 console.log(`   Alert To: ${process.env.ALERT_EMAIL}`);
 
+// Debug: Verificar que la contraseña se está leyendo correctamente
+const password = process.env.EMAIL_PASSWORD || '';
+console.log(`   Password length: ${password.length} caracteres`);
+console.log(`   Password preview: ${password.substring(0, 4)}...${password.substring(password.length - 4)}`);
+console.log(`   Password has spaces: ${password.includes(' ') ? 'SÍ ⚠️' : 'NO ✓'}`);
+
 transporter.verify((error, success) => {
   if (error) {
     console.error('❌ Error en configuración de email:', error.message);
