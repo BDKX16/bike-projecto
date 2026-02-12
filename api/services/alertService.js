@@ -11,12 +11,15 @@ const ALERT_COOLDOWN = {
 
 // Configurar transportador de email
 // Soporta tanto Gmail como SMTP personalizado
+const smtpPort = parseInt(process.env.SMTP_PORT || '587');
+const isSecurePort = smtpPort === 465; // Puerto 465 requiere secure: true
+
 const transporter = nodemailer.createTransport(
   process.env.SMTP_HOST ? {
     // SMTP personalizado
     host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true', // true para 465, false para otros puertos
+    port: smtpPort,
+    secure: isSecurePort || process.env.SMTP_SECURE === 'true', // true para 465, false para 587
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD
@@ -31,7 +34,9 @@ const transporter = nodemailer.createTransport(
     socketTimeout: 60000,
     tls: {
       rejectUnauthorized: false
-    }
+    },
+    logger: true, // Activar logs de debug
+    debug: true   // Activar modo debug
   } : {
     // Gmail por defecto
     service: 'gmail',
@@ -54,16 +59,26 @@ const transporter = nodemailer.createTransport(
 );
 
 // Verificar configuración del transporter al iniciar
+console.log('📧 Configuración de email:');
+console.log(`   Host: ${process.env.SMTP_HOST || 'gmail (service)'}`);
+console.log(`   Port: ${smtpPort}`);
+console.log(`   Secure: ${isSecurePort || process.env.SMTP_SECURE === 'true'}`);
+console.log(`   User: ${process.env.EMAIL_USER}`);
+console.log(`   Alert To: ${process.env.ALERT_EMAIL}`);
+
 transporter.verify((error, success) => {
   if (error) {
     console.error('❌ Error en configuración de email:', error.message);
+    console.error('   Error code:', error.code);
     console.error('💡 Verifica:');
     console.error('   1. EMAIL_USER está configurado correctamente');
     console.error('   2. EMAIL_PASSWORD es una "App Password" de Gmail (no tu contraseña normal)');
     console.error('   3. La verificación en 2 pasos está activada en tu cuenta de Gmail');
     console.error('   4. Genera App Password en: https://myaccount.google.com/apppasswords');
+    console.error('   5. Para puerto 465, secure debe ser true (detección automática activada)');
   } else {
     console.log('✅ Servicio de email configurado correctamente');
+    console.log('✅ Conexión a SMTP verificada exitosamente');
   }
 });
 
