@@ -34,9 +34,7 @@ const transporter = nodemailer.createTransport(
     socketTimeout: 60000,
     tls: {
       rejectUnauthorized: false
-    },
-    logger: true, // Activar logs de debug
-    debug: true   // Activar modo debug
+    }
   } : {
     // Gmail por defecto
     service: 'gmail',
@@ -59,32 +57,11 @@ const transporter = nodemailer.createTransport(
 );
 
 // Verificar configuración del transporter al iniciar
-console.log('📧 Configuración de email:');
-console.log(`   Host: ${process.env.SMTP_HOST || 'gmail (service)'}`);
-console.log(`   Port: ${smtpPort}`);
-console.log(`   Secure: ${isSecurePort || process.env.SMTP_SECURE === 'true'}`);
-console.log(`   User: ${process.env.EMAIL_USER}`);
-console.log(`   Alert To: ${process.env.ALERT_EMAIL}`);
-
-// Debug: Verificar que la contraseña se está leyendo correctamente
-const password = process.env.EMAIL_PASSWORD || '';
-console.log(`   Password length: ${password.length} caracteres`);
-console.log(`   Password preview: ${password.substring(0, 4)}...${password.substring(password.length - 4)}`);
-console.log(`   Password has spaces: ${password.includes(' ') ? 'SÍ ⚠️' : 'NO ✓'}`);
-
 transporter.verify((error, success) => {
   if (error) {
     console.error('❌ Error en configuración de email:', error.message);
-    console.error('   Error code:', error.code);
-    console.error('💡 Verifica:');
-    console.error('   1. EMAIL_USER está configurado correctamente');
-    console.error('   2. EMAIL_PASSWORD es una "App Password" de Gmail (no tu contraseña normal)');
-    console.error('   3. La verificación en 2 pasos está activada en tu cuenta de Gmail');
-    console.error('   4. Genera App Password en: https://myaccount.google.com/apppasswords');
-    console.error('   5. Para puerto 465, secure debe ser true (detección automática activada)');
   } else {
     console.log('✅ Servicio de email configurado correctamente');
-    console.log('✅ Conexión a SMTP verificada exitosamente');
   }
 });
 
@@ -321,9 +298,6 @@ async function sendAlertEmail(data, alerts) {
 
 // Enviar email de carga completa
 async function sendChargeCompleteEmail(data) {
-  console.log('📧 Preparando email de carga completa...');
-  console.log('📊 Datos recibidos:', JSON.stringify(data, null, 2));
-  
   // Verificar throttling para carga completa
   const canSend = await canSendAlert('charge_complete');
   if (!canSend) {
@@ -332,7 +306,6 @@ async function sendChargeCompleteEmail(data) {
   }
 
   const { device, voltage, percent, cycles } = data;
-  console.log(`📋 Preparando email para: ${device} - ${voltage}V - ${percent}% - ${cycles} ciclos`);
 
   const subject = `✅ Carga Completa - ${device}`;
 
@@ -378,28 +351,16 @@ async function sendChargeCompleteEmail(data) {
     html
   };
 
-  console.log('📮 Opciones de email configuradas:');
-  console.log(`   From: ${mailOptions.from}`);
-  console.log(`   To: ${mailOptions.to}`);
-  console.log(`   Subject: ${mailOptions.subject}`);
-  console.log('🚀 Intentando enviar email...');
-
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✉️ Email de carga completa enviado exitosamente!`);
-    console.log(`   Message ID: ${info.messageId}`);
-    console.log(`   Response: ${info.response}`);
+    console.log(`✉️ Email de carga completa enviado: ${info.messageId}`);
     
     // Registrar que se envió la alerta
     await logAlert('charge_complete');
     
     return info;
   } catch (error) {
-    console.error('❌ Error enviando email de carga completa:');
-    console.error('   Error name:', error.name);
-    console.error('   Error message:', error.message);
-    console.error('   Error code:', error.code);
-    console.error('   Error stack:', error.stack);
+    console.error('❌ Error enviando email de carga completa:', error.message);
     throw error;
   }
 }
