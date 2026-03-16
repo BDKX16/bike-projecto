@@ -8,7 +8,7 @@ import { EmptyBatteryState, LoadingBatteryState, ErrorBatteryState } from "@/com
 import { useBatteryData } from "@/hooks/use-battery-data"
 
 export default function Home() {
-  const { data, loading, error, refetch } = useBatteryData(60000) // Refrescar cada 60 segundos
+  const { data, loading, error, refetch, isStale, lastUpdate } = useBatteryData(60000) // Refrescar cada 60 segundos
 
   return (
     <main className="relative">
@@ -24,7 +24,7 @@ export default function Home() {
       ) : (
         <>
           <div className="relative z-10">
-            <HeroSection data={data} />
+            <HeroSection data={data} isStale={isStale} lastUpdate={lastUpdate} />
           </div>
           <div className="relative z-30">
             <ProjectSection />

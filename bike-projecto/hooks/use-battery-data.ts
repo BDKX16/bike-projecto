@@ -6,12 +6,18 @@ interface UseBatteryDataReturn {
   loading: boolean
   error: string | null
   refetch: () => void
+  isStale: boolean
+  lastUpdate: Date | null
 }
+
+const STALE_THRESHOLD_MS = 15 * 60 * 1000 // 15 minutos
 
 export function useBatteryData(refreshInterval: number = 60000): UseBatteryDataReturn {
   const [data, setData] = useState<BikeData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isStale, setIsStale] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
 
   const fetchData = async () => {
     try {
@@ -41,10 +47,26 @@ export function useBatteryData(refreshInterval: number = 60000): UseBatteryDataR
       const result = await response.json()
       
       if (result.success && result.data) {
-        setData(result.data)
+        const rawData: BikeData = result.data
+        const dataTimestamp = new Date(rawData.timestamp)
+        const now = new Date()
+        const timeDiff = now.getTime() - dataTimestamp.getTime()
+        const isDataStale = timeDiff > STALE_THRESHOLD_MS
+        
+        // Si pasaron más de 15 minutos, asumir que NO está cargando
+        const processedData: BikeData = {
+          ...rawData,
+          charging: isDataStale ? false : rawData.charging
+        }
+        
+        setData(processedData)
+        setLastUpdate(dataTimestamp)
+        setIsStale(isDataStale)
         setError(null)
       } else {
         setData(null)
+        setLastUpdate(null)
+        setIsStale(false)
       }
     } catch (err) {
       console.error('Error fetching battery data:', err)
@@ -67,6 +89,8 @@ export function useBatteryData(refreshInterval: number = 60000): UseBatteryDataR
     data,
     loading,
     error,
-    refetch: fetchData
+    refetch: fetchData,
+    isStale,
+    lastUpdate
   }
 }
