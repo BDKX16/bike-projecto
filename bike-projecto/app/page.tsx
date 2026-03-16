@@ -4,6 +4,7 @@ import { HeroSection } from "@/components/hero-section"
 import { ProjectSection } from "@/components/project-section"
 import { ScrollDarkener } from "@/components/scroll-darkener"
 import { BikeFrame } from "@/components/bike-frame"
+import { SettingsModal } from "@/components/settings-modal"
 import { EmptyBatteryState, LoadingBatteryState, ErrorBatteryState } from "@/components/battery-states"
 import { useBatteryData } from "@/hooks/use-battery-data"
 
@@ -14,6 +15,7 @@ export default function Home() {
     <main className="relative">
       <BikeFrame />
       <ScrollDarkener />
+      <SettingsModal />
       
       {loading ? (
         <LoadingBatteryState />

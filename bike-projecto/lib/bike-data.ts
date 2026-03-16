@@ -9,6 +9,7 @@ export interface BikeData {
   cycles: number
   maxCycles?: number
   charging: boolean
+  gpioVoltage?: number
   timestamp: number
 }
 

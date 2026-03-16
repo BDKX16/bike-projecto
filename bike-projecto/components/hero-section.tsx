@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronDown, Zap, Clock } from "lucide-react"
+import { ChevronDown, Zap, Clock, Timer } from "lucide-react"
 import { BatteryGauge } from "./battery-gauge"
 import { BatteryStats } from "./battery-stats"
 import { BatteryAlert } from "./battery-alert"
@@ -28,7 +28,46 @@ function formatRelativeTime(date: Date): string {
   return `Hace ${diffDays} días`
 }
 
+function calculateChargingTime(data: BikeData): string | null {
+  // Solo calcular si está cargando y tenemos los datos necesarios
+  if (!data.charging || data.consumedAh === undefined || data.remainingAh === undefined) {
+    return null
+  }
+
+  // Si ya está casi completa (>99.5%), mostrar que falta poco
+  if (data.percent >= 99.5) {
+    return "Casi completa"
+  }
+
+  const CHARGER_CURRENT = 1.0 // 1A
+  const totalCapacityAh = data.remainingAh + data.consumedAh
+  const ahToFull = totalCapacityAh - data.remainingAh
+  
+  // Tiempo en horas
+  const hoursToFull = ahToFull / CHARGER_CURRENT
+  
+  // Convertir a horas y minutos
+  const hours = Math.floor(hoursToFull)
+  const minutes = Math.round((hoursToFull - hours) * 60)
+  
+  if (hours === 0 && minutes < 5) {
+    return "Unos minutos"
+  } else if (hours === 0) {
+    return `~${minutes} min`
+  } else if (hours === 1 && minutes === 0) {
+    return "~1 hora"
+  } else if (hours === 1) {
+    return `~1h ${minutes}min`
+  } else if (minutes === 0) {
+    return `~${hours} horas`
+  } else {
+    return `~${hours}h ${minutes}min`
+  }
+}
+
 export function HeroSection({ data, isStale, lastUpdate }: HeroSectionProps) {
+  const estimatedTime = calculateChargingTime(data)
+  
   return (
     <section className="relative flex min-h-screen flex-col items-center justify-center px-4 pb-20 pt-16">
       {/* Radial gradient behind content for readability */}
@@ -97,6 +136,16 @@ export function HeroSection({ data, isStale, lastUpdate }: HeroSectionProps) {
           </>
         )}
       </div>
+
+      {/* Charging time estimate */}
+      {estimatedTime && !isStale && (
+        <div className="liquid-glass-pill relative z-10 mt-3 flex items-center gap-2 rounded-full border border-green-500/30 px-4 py-2">
+          <Timer className="h-3 w-3 text-green-400" />
+          <span className="font-mono text-xs tracking-wider text-green-400">
+            {estimatedTime} hasta carga completa
+          </span>
+        </div>
+      )}
 
       {/* Timestamp badge */}
       {lastUpdate && (

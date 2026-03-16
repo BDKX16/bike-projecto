@@ -11,6 +11,7 @@ const bikeDataSchema = new mongoose.Schema({
   cycles: { type: Number, required: true },
   maxCycles: { type: Number },
   charging: { type: Boolean, required: true },
+  gpioVoltage: { type: Number }, // Voltaje GPIO raw para debug
   espTimestamp: { type: Number },
   timestamp: { type: Date, default: Date.now }
 });

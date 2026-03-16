@@ -30,9 +30,12 @@ Guarda datos de telemetría de la bicicleta enviados desde el ESP32.
   "cycles": 15,
   "maxCycles": 100,
   "charging": false,
+  "gpioVoltage": 2.85,
   "timestamp": 123456789
 }
 ```
+
+**Nota:** El campo `gpioVoltage` es opcional y se usa para debug del voltaje raw del GPIO del ESP32.
 
 **Respuesta:**
 ```json
@@ -50,6 +53,7 @@ Guarda datos de telemetría de la bicicleta enviados desde el ESP32.
     "cycles": 15,
     "maxCycles": 100,
     "charging": false,
+    "gpioVoltage": 2.85,
     "espTimestamp": 123456789,
     "timestamp": "2026-02-12T10:30:00.000Z"
   },
@@ -94,6 +98,81 @@ Obtiene el último registro guardado.
 }
 ```
 
+### GET /api/settings
+Obtiene la configuración actual de notificaciones y alertas.
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "data": {
+    "emailNotifications": {
+      "enabled": true,
+      "email": "usuario@example.com",
+      "highBatteryAlert": {
+        "enabled": true,
+        "threshold": 80
+      },
+      "lowBatteryAlert": {
+        "enabled": true,
+        "threshold": 20
+      },
+      "criticalBatteryAlert": {
+        "enabled": true,
+        "threshold": 10
+      },
+      "chargeCompleteAlert": {
+        "enabled": true
+      },
+      "chargeStartedAlert": {
+        "enabled": false
+      }
+    }
+  }
+}
+```
+
+### POST /api/settings
+Actualiza la configuración de notificaciones. **Requiere contraseña de administrador.**
+
+**Body:**
+```json
+{
+  "password": "ebike2024",
+  "settings": {
+    "emailNotifications": {
+      "enabled": true,
+      "email": "nuevo@example.com",
+      "highBatteryAlert": {
+        "enabled": true,
+        "threshold": 80
+      },
+      "lowBatteryAlert": {
+        "enabled": true,
+        "threshold": 20
+      }
+    }
+  }
+}
+```
+
+**Respuesta exitosa:**
+```json
+{
+  "success": true,
+  "data": { ... },
+  "message": "Configuración guardada exitosamente"
+}
+```
+
+**Respuesta con contraseña incorrecta:**
+```json
+{
+  "success": false,
+  "error": "Contraseña incorrecta"
+}
+```
+
 ### GET /health
 Health check del servidor.
 
@@ -120,6 +199,16 @@ node test-charge-complete.js
 Simula una secuencia de carga del 70% al 100% y verifica que solo envíe UN email al completar.
 
 **3. Test de throttling:**
+```bash
+node test-throttling.js
+```
+Envía la misma alerta CRÍTICA 3 veces consecutivas y verifica que solo envíe UN email (las otras están en cooldown).
+
+**4. Test de gpioVoltage:**
+```bash
+node test-gpio-voltage.js
+```
+Verifica que el campo `gpioVoltage` (para debug) se persista correctamente en MongoDB.
 ```bash
 node test-throttling.js
 ```
@@ -197,3 +286,36 @@ Durante la carga no se analizan alertas de batería baja, solo se detecta:
 - Carga completa (100%)
 
 Cada email incluye recomendaciones específicas para cuidar la batería de litio 10s3p.
+
+## Sistema de Configuración
+
+La API incluye un sistema de configuración persistente en MongoDB que permite personalizar las notificaciones desde el frontend.
+
+### Características de Configuración:
+
+**Notificaciones por Email:**
+- ✅ Activar/desactivar todas las notificaciones
+- ✅ Configurar email de destino
+- ✅ Alerta de batería alta (al cargar): personalizar umbral (ej: 80%)
+- ✅ Alerta de batería baja: personalizar umbral (ej: 20%)
+- ✅ Alerta de batería crítica: personalizar umbral (ej: 10%)
+- ✅ Alerta de carga completa: activar/desactivar
+- 🔜 Alerta de inicio de carga (próximamente)
+- 🔜 Alerta de temperatura (próximamente)
+
+### Seguridad:
+
+El sistema requiere autenticación para modificar la configuración:
+- Los cambios solo se guardan si se proporciona la contraseña correcta
+- La contraseña se configura en `ADMIN_PASSWORD` en el archivo `.env`
+- Por defecto: `ebike2024` (se recomienda cambiarla)
+
+### Desde el Frontend:
+
+Los usuarios pueden acceder al modal de configuración haciendo clic en el ícono de engranaje ⚙️ en la esquina superior derecha del dashboard.
+
+### Configuración Automática:
+
+- Si no hay configuración guardada, se crea automáticamente con valores por defecto
+- La configuración se sincroniza con cada lectura de batería
+- Las alertas personalizadas (80% alto, 20% bajo) se envían solo cuando se cruza el umbral

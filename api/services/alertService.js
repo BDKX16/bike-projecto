@@ -254,8 +254,14 @@ function generateEmailContent(data, alerts) {
 }
 
 // Enviar email de alerta
-async function sendAlertEmail(data, alerts) {
+async function sendAlertEmail(data, alerts, settings = null) {
   if (alerts.length === 0) return null;
+
+  // Si hay configuración, verificar si los emails están habilitados
+  if (settings && !settings.emailNotifications?.enabled) {
+    console.log('📧 Emails de notificación deshabilitados en configuración');
+    return null;
+  }
 
   // Determinar el nivel más alto de alerta
   const hasCritical = alerts.some(a => a.level === 'CRÍTICO');
@@ -275,16 +281,19 @@ async function sendAlertEmail(data, alerts) {
 
   const { subject, html } = generateEmailContent(data, alerts);
 
+  // Usar el email de la configuración si está disponible, sino usar el de .env
+  const recipientEmail = settings?.emailNotifications?.email || process.env.ALERT_EMAIL;
+
   const mailOptions = {
     from: process.env.EMAIL_USER,
-    to: process.env.ALERT_EMAIL,
+    to: recipientEmail,
     subject,
     html
   };
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✉️ Email de alerta enviado: ${info.messageId}`);
+    console.log(`✉️ Email de alerta enviado a ${recipientEmail}: ${info.messageId}`);
     
     // Registrar que se envió la alerta
     await logAlert(alertType);
@@ -297,7 +306,18 @@ async function sendAlertEmail(data, alerts) {
 }
 
 // Enviar email de carga completa
-async function sendChargeCompleteEmail(data) {
+async function sendChargeCompleteEmail(data, settings = null) {
+  // Si hay configuración, verificar si está habilitado
+  if (settings && !settings.emailNotifications?.enabled) {
+    console.log('📧 Emails de notificación deshabilitados en configuración');
+    return null;
+  }
+
+  if (settings && !settings.emailNotifications?.chargeCompleteAlert?.enabled) {
+    console.log('📧 Alerta de carga completa deshabilitada en configuración');
+    return null;
+  }
+
   // Verificar throttling para carga completa
   const canSend = await canSendAlert('charge_complete');
   if (!canSend) {
@@ -344,16 +364,19 @@ async function sendChargeCompleteEmail(data) {
     </div>
   `;
 
+  // Usar el email de la configuración si está disponible, sino usar el de .env
+  const recipientEmail = settings?.emailNotifications?.email || process.env.ALERT_EMAIL;
+
   const mailOptions = {
     from: process.env.EMAIL_USER,
-    to: process.env.ALERT_EMAIL,
+    to: recipientEmail,
     subject,
     html
   };
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✉️ Email de carga completa enviado: ${info.messageId}`);
+    console.log(`✉️ Email de carga completa enviado a ${recipientEmail}: ${info.messageId}`);
     
     // Registrar que se envió la alerta
     await logAlert('charge_complete');
