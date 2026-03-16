@@ -55,16 +55,17 @@ export function RangeIndicator({ data }: RangeIndicatorProps) {
 
       {/* Barra de progreso con ícono de bicicleta */}
       <div className="relative h-12 w-full">
-        {/* Track de fondo */}
-        <div className="absolute inset-0 rounded-full bg-muted/20" />
+        {/* Track de fondo (zona no disponible) */}
+        <div className="absolute inset-0 rounded-full bg-muted/30 border border-muted/40" />
         
-        {/* Barra de progreso */}
+        {/* Barra de progreso coloreada (zona disponible) */}
         <div
           className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
           style={{
             width: `${Math.max(5, Math.min(percentage, 100))}%`,
-            background: `linear-gradient(to right, ${color}80, ${color})`,
-            boxShadow: `0 0 20px ${color}40`
+            background: `linear-gradient(to right, ${color}90, ${color})`,
+            boxShadow: `0 0 25px ${color}60, inset 0 2px 10px ${color}50`,
+            border: `1px solid ${color}`
           }}
         />
 
@@ -79,7 +80,7 @@ export function RangeIndicator({ data }: RangeIndicatorProps) {
           <div
             className="flex h-10 w-10 items-center justify-center rounded-full bg-background shadow-lg"
             style={{
-              boxShadow: `0 0 20px ${color}, 0 4px 12px rgba(0,0,0,0.3)`
+              boxShadow: `0 0 0 2px ${color}, 0 0 20px ${color}, 0 4px 12px rgba(0,0,0,0.3)`
             }}
           >
             <Bike className="h-5 w-5" style={{ color }} />
@@ -95,15 +96,7 @@ export function RangeIndicator({ data }: RangeIndicatorProps) {
         </span>
       </div>
 
-      {/* Info adicional */}
-      <div className="mt-3 rounded-lg bg-muted/10 p-3 text-center">
-        <p className="text-xs text-muted-foreground">
-          Estimación basada en motor 350W • Rodado 26 • Consumo ~{AVERAGE_CONSUMPTION_WH_KM} Wh/km
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground/70">
-          {whAvailable.toFixed(0)} Wh disponibles de {maxWh.toFixed(0)} Wh totales
-        </p>
-      </div>
+     
     </div>
   )
 }

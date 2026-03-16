@@ -161,20 +161,28 @@ export function SettingsModal() {
     })
   }
 
-  if (!settings) return null
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
-          className="fixed right-4 top-4 z-50 h-10 w-10 rounded-full bg-background/80 backdrop-blur-sm hover:bg-accent"
+          className="fixed right-4 top-4 z-[100] h-10 w-10 rounded-full bg-background/80 backdrop-blur-sm shadow-lg hover:bg-accent hover:shadow-xl"
+          title="Configuración"
         >
           <SettingsIcon className="h-5 w-5" />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        {!settings ? (
+          <div className="flex items-center justify-center p-8">
+            <div className="text-center">
+              <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+              <p className="text-sm text-muted-foreground">Cargando configuración...</p>
+            </div>
+          </div>
+        ) : (
+          <>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <SettingsIcon className="h-5 w-5" />
@@ -443,6 +451,8 @@ export function SettingsModal() {
             </Button>
           </div>
         </div>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   )
