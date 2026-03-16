@@ -3,7 +3,6 @@
 import { ChevronDown, Zap, Clock, Timer } from "lucide-react"
 import { BatteryGauge } from "./battery-gauge"
 import { BatteryStats } from "./battery-stats"
-import { BatteryAlert } from "./battery-alert"
 import type { BikeData } from "@/lib/bike-data"
 
 interface HeroSectionProps {
@@ -93,11 +92,6 @@ export function HeroSection({ data, isStale, lastUpdate }: HeroSectionProps) {
         <p className="mt-2 text-center text-sm text-muted-foreground">
           Telemetría en tiempo real
         </p>
-      </div>
-
-      {/* Alert - Solo si hay alguna alerta que mostrar */}
-      <div className="relative z-10 mb-6 w-full max-w-2xl">
-        <BatteryAlert data={data} />
       </div>
 
       {/* Battery Gauge */}

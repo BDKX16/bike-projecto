@@ -25,7 +25,9 @@ export function BatteryStats({ data }: BatteryStatsProps) {
       icon: Battery,
       label: "Restante",
       value: `${data.remainingAh.toFixed(2)}Ah`,
-      sub: `${data.consumedAh.toFixed(2)}Ah usados`,
+      sub: data.charging 
+        ? `${data.consumedAh.toFixed(2)}Ah para completar`
+        : `${data.consumedAh.toFixed(2)}Ah usados`,
     }] : [{
       icon: Battery,
       label: "Capacidad",
