@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X, AlertCircle, CheckCircle } from "lucide-react"
+import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useToast } from "@/hooks/use-toast"
 
 interface Settings {
   emailNotifications: {
@@ -49,13 +49,12 @@ interface Settings {
 }
 
 export function SettingsModal() {
+  const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(false)
   const [password, setPassword] = useState("")
   const [showPasswordInput, setShowPasswordInput] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
 
   // Cargar configuración al abrir el modal
   useEffect(() => {
@@ -79,7 +78,11 @@ export function SettingsModal() {
       }
     } catch (err) {
       console.error('Error fetching settings:', err)
-      setError('Error al cargar la configuración')
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Error al cargar la configuración",
+      })
     } finally {
       setLoading(false)
     }
@@ -88,21 +91,20 @@ export function SettingsModal() {
   const handleSave = async () => {
     if (!showPasswordInput) {
       setShowPasswordInput(true)
-      setError(null)
-      setSuccess(false)
       return
     }
 
     if (!password) {
-      setError('Por favor ingresa la contraseña')
-      setSuccess(false)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Por favor ingresa la contraseña",
+      })
       return
     }
 
     try {
       setLoading(true)
-      setError(null)
-      setSuccess(false)
       
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'
       const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost'
@@ -122,22 +124,30 @@ export function SettingsModal() {
       const data = await response.json()
       
       if (data.success) {
-        setSuccess(true)
+        toast({
+          title: "✅ Éxito",
+          description: "Configuración guardada exitosamente",
+          className: "border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100",
+        })
         setPassword('')
         setShowPasswordInput(false)
-        setError(null)
         setTimeout(() => {
-          setSuccess(false)
           setOpen(false)
         }, 2000)
       } else {
-        setError(data.error || 'Contraseña incorrecta. Por favor, inténtalo de nuevo.')
-        setSuccess(false)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: data.error || 'Contraseña incorrecta. Por favor, inténtalo de nuevo.',
+        })
       }
     } catch (err) {
       console.error('Error saving settings:', err)
-      setError('Error al conectar con el servidor. Por favor, verifica tu conexión.')
-      setSuccess(false)
+      toast({
+        variant: "destructive",
+        title: "Error de conexión",
+        description: "Error al conectar con el servidor. Por favor, verifica tu conexión.",
+      })
     } finally {
       setLoading(false)
     }
@@ -199,22 +209,6 @@ export function SettingsModal() {
             Configura las alertas y notificaciones por correo electrónico
           </DialogDescription>
         </DialogHeader>
-
-        {error && (
-          <Alert variant="destructive" className="animate-in fade-in-50 slide-in-from-top-2">
-            <AlertCircle className="h-5 w-5" />
-            <AlertDescription className="font-semibold">{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert className="animate-in fade-in-50 slide-in-from-top-2 border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100">
-            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-            <AlertDescription className="font-semibold">
-              ✅ Configuración guardada exitosamente
-            </AlertDescription>
-          </Alert>
-        )}
 
         <div className="space-y-6">
           {/* Email principal */}
@@ -448,8 +442,6 @@ export function SettingsModal() {
                 setOpen(false)
                 setShowPasswordInput(false)
                 setPassword('')
-                setError(null)
-                setSuccess(false)
               }}
               disabled={loading}
             >
