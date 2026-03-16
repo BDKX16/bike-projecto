@@ -56,7 +56,7 @@ export function BatteryStats({ data }: BatteryStatsProps) {
           <span className="mt-1 font-mono text-lg font-bold text-foreground">
             {stat.value}
           </span>
-          <span className="mt-0.5 text-xs text-muted-foreground">{stat.sub}</span>
+          <span className="mt-0.5 text-center text-xs text-muted-foreground">{stat.sub}</span>
         </div>
       ))}
     </div>

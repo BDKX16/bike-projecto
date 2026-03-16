@@ -3,6 +3,7 @@
 import { ChevronDown, Zap, Clock, Timer } from "lucide-react"
 import { BatteryGauge } from "./battery-gauge"
 import { BatteryStats } from "./battery-stats"
+import { RangeIndicator } from "./range-indicator"
 import type { BikeData } from "@/lib/bike-data"
 
 interface HeroSectionProps {
@@ -107,6 +108,9 @@ export function HeroSection({ data, isStale, lastUpdate }: HeroSectionProps) {
       <div className="relative z-10 w-full max-w-2xl">
         <BatteryStats data={data} />
       </div>
+
+      {/* Range indicator - solo cuando no está cargando */}
+      <RangeIndicator data={data} />
 
       {/* Charging / Status badge */}
       <div className="liquid-glass-pill relative z-10 mt-6 flex items-center gap-3 rounded-full px-5 py-2.5">
