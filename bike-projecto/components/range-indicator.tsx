@@ -56,16 +56,16 @@ export function RangeIndicator({ data }: RangeIndicatorProps) {
       {/* Barra de progreso con ícono de bicicleta */}
       <div className="relative h-12 w-full">
         {/* Track de fondo (zona no disponible) */}
-        <div className="absolute inset-0 rounded-full bg-muted/30 border border-muted/40" />
+        <div className="absolute inset-0 rounded-full bg-muted/20" />
         
-        {/* Barra de progreso coloreada (zona disponible) */}
+        {/* Barra de progreso coloreada y rellena (zona disponible) */}
         <div
           className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
           style={{
             width: `${Math.max(5, Math.min(percentage, 100))}%`,
-            background: `linear-gradient(to right, ${color}90, ${color})`,
-            boxShadow: `0 0 25px ${color}60, inset 0 2px 10px ${color}50`,
-            border: `1px solid ${color}`
+            backgroundColor: color,
+            opacity: 0.85,
+            boxShadow: `0 0 20px ${color}80`
           }}
         />
 
