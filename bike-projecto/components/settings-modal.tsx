@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X } from "lucide-react"
+import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X, Clock } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,23 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
+import { useBatteryData } from "@/hooks/use-battery-data"
+
+function formatRelativeTime(date: Date): string {
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffMins < 1) return "Hace unos segundos"
+  if (diffMins === 1) return "Hace 1 minuto"
+  if (diffMins < 60) return `Hace ${diffMins} minutos`
+  if (diffHours === 1) return "Hace 1 hora"
+  if (diffHours < 24) return `Hace ${diffHours} horas`
+  if (diffDays === 1) return "Hace 1 día"
+  return `Hace ${diffDays} días`
+}
 
 interface Settings {
   emailNotifications: {
@@ -50,6 +67,7 @@ interface Settings {
 
 export function SettingsModal() {
   const { toast } = useToast()
+  const { isStale, lastUpdate } = useBatteryData()
   const [open, setOpen] = useState(false)
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(false)
@@ -208,6 +226,15 @@ export function SettingsModal() {
           <DialogDescription>
             Configura las alertas y notificaciones por correo electrónico
           </DialogDescription>
+          {lastUpdate && (
+            <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs mt-2 w-fit ${isStale ? "bg-orange-500/10 border border-orange-500/30" : "bg-muted"}`}>
+              <Clock className={`h-3 w-3 ${isStale ? "text-orange-400" : "text-muted-foreground"}`} />
+              <span className={`font-mono tracking-wider ${isStale ? "text-orange-400" : "text-muted-foreground"}`}>
+                {formatRelativeTime(lastUpdate)}
+                {isStale && " (sin conexión)"}
+              </span>
+            </div>
+          )}
         </DialogHeader>
 
         <div className="space-y-6">
