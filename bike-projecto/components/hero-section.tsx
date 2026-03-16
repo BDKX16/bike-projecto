@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronDown, Zap, Clock, Timer } from "lucide-react"
+import { ChevronDown, Zap, Timer } from "lucide-react"
 import { BatteryGauge } from "./battery-gauge"
 import { BatteryStats } from "./battery-stats"
 import { RangeIndicator } from "./range-indicator"
@@ -10,22 +10,6 @@ interface HeroSectionProps {
   data: BikeData
   isStale: boolean
   lastUpdate: Date | null
-}
-
-function formatRelativeTime(date: Date): string {
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / (1000 * 60))
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-  if (diffMins < 1) return "Hace unos segundos"
-  if (diffMins === 1) return "Hace 1 minuto"
-  if (diffMins < 60) return `Hace ${diffMins} minutos`
-  if (diffHours === 1) return "Hace 1 hora"
-  if (diffHours < 24) return `Hace ${diffHours} horas`
-  if (diffDays === 1) return "Hace 1 día"
-  return `Hace ${diffDays} días`
 }
 
 function calculateChargingTime(data: BikeData): string | null {
@@ -141,17 +125,6 @@ export function HeroSection({ data, isStale, lastUpdate }: HeroSectionProps) {
           <Timer className="h-3 w-3 text-green-400" />
           <span className="font-mono text-xs tracking-wider text-green-400">
             {estimatedTime} hasta carga completa
-          </span>
-        </div>
-      )}
-
-      {/* Timestamp badge */}
-      {lastUpdate && (
-        <div className={`liquid-glass-pill relative z-10 mt-3 flex items-center gap-2 rounded-full px-4 py-2 ${isStale ? "border border-orange-500/30" : ""}`}>
-          <Clock className={`h-3 w-3 ${isStale ? "text-orange-400" : "text-muted-foreground"}`} />
-          <span className={`font-mono text-xs tracking-wider ${isStale ? "text-orange-400" : "text-muted-foreground"}`}>
-            {formatRelativeTime(lastUpdate)}
-            {isStale && " (sin conexión)"}
           </span>
         </div>
       )}
