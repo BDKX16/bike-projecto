@@ -130,10 +130,10 @@ export function ProjectSection() {
               <br />
               <span className="text-muted-foreground">desde cero</span>
             </h2>
-            <p className="mx-auto mt-4 max-w-xl leading-relaxed text-muted-foreground">
-              El proyecto empezo como una idea de reciclar celdas de litio viejas
-              y termino siendo una bicicleta electrica completa con telemetria en
-              tiempo real. Aca va el paso a paso.
+            <p className="mx-auto mt-4 max-w-xl leading-relaxed text-left text-muted-foreground">
+              El proyecto empezo como una idea de transformar una bici en electrica
+              y termino siendo un desarrollo tecnologico propio, integrando multiples 
+              sensores a tiempo real y pantalla interactiva. Aca va el paso a paso.
             </p>
           </div>
         </FadeInSection>
