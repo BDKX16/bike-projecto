@@ -47,44 +47,44 @@ const buildSteps = [
     number: "01",
     title: "Investigacion y planificacion",
     description:
-      "Empece investigando distintas configuraciones de baterias de litio, motores hub y controladores. La idea era armar un pack 10s2p con celdas 18650 recicladas de notebooks viejas que fui juntando. Calcule la autonomia que necesitaba para mis viajes diarios y elegi el voltaje acorde.",
-    image: "/images/maker-cells.jpg",
+      "Empece buscando entre los kits de conversion que habia en el mercado y todas resultaban exesivamente caras y motores poco eficientes, con engranajes de nylon la mayoria. Analice distintas configuraciones de baterias de litio, motores hub y controladores. La idea era armar un prototipo desarmando un Hoverboard y adaptando el motor. Prototipo el cual fallo en cada aspecto, pero permitio hacer el disño del chasis de todo el sistema electrico.",
+    image: "/images/celdas.png",
     imageAlt: "Celdas 18650 dispuestas en configuracion 10s2p sobre el banco de trabajo",
-    materials: ["20x celdas 18650", "Spot welder", "Tiras de niquel", "Multimetro"],
+    materials: ["Hoverboard", "Soldador", "Impresora 3d", "Controlador de motor"],
   },
   {
     number: "02",
     title: "Armado del battery pack",
     description:
-      "El paso mas critico: soldar las celdas con spot welder, cablear el BMS (Battery Management System) celda por celda, y testear que todo quede balanceado. Use un BMS de 10S 20A con balanceo activo. Cada conexion fue verificada con multimetro antes de cerrar el pack.",
-    image: "/images/maker-soldering.jpg",
+      "Luego del prototipo, aprendi que el corazon del proyecto era el battery pack, asi que empeze a hacerlo en serio, y uno bueno. Compre celdas de altisima calidad y control para poder entregar muchisima potencia, 20A, y bastante autonomia, 20km aproximadamente. El paso mas critico: soldar las celdas con spot welder, cablear el BMS (Battery Management System) celda por celda, y testear que todo quede balanceado. Use un BMS de 10S 20A con balanceo activo. Imprimi separadores con la impresora 3D. Y compre un soldador de punto para asegurar conexiones seguras.",
+    image: "/images/battery-pack.png",
     imageAlt: "Soldando cables al BMS del battery pack en el banco de trabajo",
-    materials: ["BMS 10S 20A", "Cable silicona 12AWG", "Termocontraible", "Cinta kapton"],
+    materials: ["BMS 10S 20A", "Cable silicona 12AWG", "Soldador de puntos", "Cinta kapton"],
   },
   {
     number: "03",
     title: "Conversion de la bicicleta",
     description:
-      "Monte un motor hub de 350W en la rueda trasera. Tuve que redisenar el soporte del eje porque no entraba en las punteras originales. El controlador lo ubique debajo del asiento con un case impreso en 3D. Todo el cableado paso por dentro del cuadro lo mas posible.",
-    image: "/images/maker-frame.jpg",
+      "Luego de haber instalado la bateria nueva, fue tan potente que quemó (literalmente se derritió) el motor de plastico del hoverboard. Por tanto compre un motor de monopatin de 350W y de aluminio, para que discipe todo ese calor. Todo el cableado lo pase con un cobertor adecuado para que quede lo mas prolijo posible. Con este motor alcance una velocidad maxima de 35km/h, y casi 45 km/h pedaleando. El motor va instalado en la rueda delantera, con un controlador de 18A y un acelerador tipo de moto. El freno lo saque pero mas adelante pienso instalar uno a disco en la rueda del motor por seguridad ya que es mucha la velocidad que alcanza.",
+    image: "/images/bici.png",
     imageAlt: "Instalacion del motor hub en la rueda trasera de la bicicleta",
-    materials: ["Motor hub 350W", "Controlador 15A", "Acelerador thumb", "Conectores XT60"],
+    materials: ["Motor hub 350W", "Controlador 18A", "Acelerador tipo moto", "Conectores XT60"],
   },
   {
     number: "04",
     title: "Telemetria con ESP32",
     description:
-      "Arme un modulo de telemetria con un ESP32 que lee voltaje y corriente del pack via un sensor INA219. Los datos se mandan por WiFi a un servidor y se muestran en esta web en tiempo real. El firmware esta en MicroPython y el ESP va alimentado directo del BMS.",
-    image: "/images/maker-electronics.jpg",
+      "Arme un modulo de telemetria con un ESP32-C3 en la bateria que lee voltaje y corriente del pack via un sensor INA219. Los datos se mandan por WiFi a un servidor y se muestran en esta web en tiempo real. El firmware esta en C++ y el ESP va alimentado directo del BMS. En el cuadro van otros sensores como giroscopio, sensor de velocidad, etc. De esta manera puedo ver a la velocidad que voy, los kms recorridos, la autonomia restante y otros datos importantes. Asi como un menu para configurar varios modos.",
+    image: "/images/esp.jpg",
     imageAlt: "ESP32 conectado a sensores de voltaje y corriente en un breadboard",
-    materials: ["ESP32 DevKit", "Sensor INA219", "Display OLED 0.96\"", "PCB perforado"],
+    materials: ["ESP32-C3", "Sensor INA219", "Display OLED 0.96\"", "PCB perforado"],
   },
   {
     number: "05",
     title: "Resultado final",
     description:
-      "Despues de varias semanas de laburo, la bici quedo andando con una autonomia real de unos 25-30km dependiendo del terreno y cuanto pedalee. El sistema de telemetria me deja ver todo en tiempo real desde el celular. Ya lleva 15 ciclos de carga y el pack se mantiene sano.",
-    image: "/images/maker-finished.jpg",
+      "Despues de varias semanas de laburo, la bici quedo andando con una autonomia real de unos 25-30km dependiendo del terreno y cuanto pedalee. El sistema de telemetria me deja ver todo en tiempo real desde la pantalla. Ya lleva 15 ciclos de carga y el pack se mantiene sano, permitiendome llegar a mis destinos inclusive no habiendo gastado toda la bateria. El proximo paso es pintar el chasis para que quede mas integrado, y agregar un freno a disco en la rueda del motor por seguridad.",
+    image: "/images/bici-final.png",
     imageAlt: "La bicicleta electrica terminada lista para andar",
     materials: null,
   },
@@ -92,8 +92,8 @@ const buildSteps = [
 
 const materialsList = [
   { category: "Bateria", items: "20x 18650, BMS 10S, tiras de niquel, spot welder" },
-  { category: "Motor", items: "Hub 350W, controlador 15A, acelerador, freno con corte" },
-  { category: "Telemetria", items: "ESP32, INA219, OLED 0.96\", resistencias" },
+  { category: "Motor", items: "Hub 350W, controlador 18A, acelerador tipo moto, freno con corte" },
+  { category: "Telemetria", items: "ESP32-C3, INA219, OLED 0.96\", resistencias" },
   { category: "Varios", items: "Conectores XT60, cable silicona, termocontraible, bridas" },
 ]
 

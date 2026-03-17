@@ -17,22 +17,21 @@ export default function Home() {
       <ScrollDarkener />
       <SettingsModal />
       
-      {loading ? (
-        <LoadingBatteryState />
-      ) : error ? (
-        <ErrorBatteryState error={error} onRetry={refetch} />
-      ) : !data ? (
-        <EmptyBatteryState />
-      ) : (
-        <>
-          <div className="relative z-10">
-            <HeroSection data={data} isStale={isStale} lastUpdate={lastUpdate} />
-          </div>
-          <div className="relative z-30">
-            <ProjectSection />
-          </div>
-        </>
-      )}
+      <div className="relative z-10">
+        {loading ? (
+          <LoadingBatteryState />
+        ) : error ? (
+          <ErrorBatteryState error={error} onRetry={refetch} />
+        ) : !data ? (
+          <EmptyBatteryState />
+        ) : (
+          <HeroSection data={data} isStale={isStale} lastUpdate={lastUpdate} />
+        )}
+      </div>
+      
+      <div className="relative z-30">
+        <ProjectSection />
+      </div>
     </main>
   )
 }
