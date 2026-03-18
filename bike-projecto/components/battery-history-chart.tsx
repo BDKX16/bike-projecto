@@ -164,29 +164,77 @@ export function BatteryHistoryChart({ className = "", isOpen, onOpenChange }: Ba
           <p className="text-xs text-muted-foreground">{error}</p>
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={140}>
-          <BarChart data={historyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-            <Bar 
-              dataKey="percent" 
-              radius={[4, 4, 0, 0]}
-              isAnimationActive={false}
-              shape={(props: any) => {
-                const { x, y, width, height, payload } = props
-                const fill = getBarColor(payload.percent, payload.charging)
-                return (
-                  <rect
-                    x={x}
-                    y={y}
-                    width={width}
-                    height={height}
-                    fill={fill}
-                    rx={4}
-                  />
-                )
-              }}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+        <>
+          {/* Mobile chart - 170px */}
+          <div className="md:hidden">
+            <ResponsiveContainer width="100%" height={170}>
+              <BarChart data={historyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <Bar 
+                  dataKey="percent" 
+                  radius={[4, 4, 0, 0]}
+                  isAnimationActive={false}
+                  shape={(props: any) => {
+                    const { x, y, width, height, payload } = props
+                    const fill = getBarColor(payload.percent, payload.charging)
+                    return (
+                      <rect
+                        x={x}
+                        y={y}
+                        width={width}
+                        height={height}
+                        fill={fill}
+                        rx={4}
+                      />
+                    )
+                  }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          
+          {/* Desktop chart - 140px */}
+          <div className="hidden md:block">
+            <ResponsiveContainer width="100%" height={140}>
+              <BarChart data={historyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <Bar 
+                  dataKey="percent" 
+                  radius={[4, 4, 0, 0]}
+                  isAnimationActive={false}
+                  shape={(props: any) => {
+                    const { x, y, width, height, payload } = props
+                    const fill = getBarColor(payload.percent, payload.charging)
+                    return (
+                      <rect
+                        x={x}
+                        y={y}
+                        width={width}
+                        height={height}
+                        fill={fill}
+                        rx={4}
+                      />
+                    )
+                  }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          
+          {/* Referencias de colores - Solo en mobile */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 border-t border-border/30 pt-3 md:hidden">
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-full" style={{ backgroundColor: "hsl(199, 89%, 48%)" }} />
+              <span className="font-mono text-xs text-muted-foreground">Normal</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-full" style={{ backgroundColor: "hsl(0, 85%, 60%)" }} />
+              <span className="font-mono text-xs text-muted-foreground">Crítico</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 animate-pulse rounded-full" style={{ backgroundColor: "hsl(160, 80%, 48%)" }} />
+              <span className="font-mono text-xs text-green-400">Cargando</span>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
