@@ -198,6 +198,218 @@ Actualiza la configuración de notificaciones. **Requiere contraseña de adminis
 }
 ```
 
+---
+
+## 🔄 Sistema OTA (Over-The-Air Updates)
+
+El sistema incluye actualizaciones OTA automáticas para los dispositivos ESP32.
+
+### Características OTA
+
+- ✅ Verificación automática de actualizaciones al conectar el cargador
+- ✅ Notificación en respuesta del endpoint `/api/battery`
+- ✅ Gestión de versiones en base de datos
+- ✅ Rollout gradual (porcentaje de dispositivos)
+- ✅ Target específico de dispositivos
+- ✅ Generación automática de `version.json`
+- ✅ Servir archivos `.bin` vía HTTP/HTTPS
+
+### Flujo de Actualización
+
+1. **ESP32 reporta datos** → POST `/api/battery` con `firmwareVersion`
+2. **Servidor verifica** → Compara con última versión disponible
+3. **Respuesta incluye**:
+   ```json
+   {
+     "status": "ok",
+     "updateAvailable": true,
+     "currentVersion": "1.0.0",
+     "newVersion": "1.0.1",
+     "releaseNotes": "Fix crítico en sensor de corriente"
+   }
+   ```
+4. **ESP32 descarga** → GET `/firmware/battery.bin`
+5. **ESP32 instala y reinicia**
+
+### Endpoints OTA
+
+#### GET /api/ota/check-update
+Verifica si hay actualización disponible (alternativa al POST /api/battery).
+
+**Query Parameters:**
+- `device`: Tipo de dispositivo (battery/mainboard)
+- `version`: Versión actual del firmware
+- `deviceId`: ID del dispositivo (opcional)
+
+**Ejemplo:**
+```
+GET /api/ota/check-update?device=battery&version=1.0.0&deviceId=eBikeBattery
+```
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "updateAvailable": true,
+  "currentVersion": "1.0.0",
+  "newVersion": "1.0.1",
+  "releaseNotes": "Fix crítico en calibración del sensor",
+  "size": 856320,
+  "md5": "a3f5c8d1e9b2f4a6c8e1d3f5a7b9c2e4"
+}
+```
+
+#### POST /api/ota/register
+Registra una nueva versión de firmware. **Requiere contraseña de administrador.**
+
+**Body:**
+```json
+{
+  "password": "ebike2024",
+  "device": "BATTERY",
+  "version": "1.0.1",
+  "filename": "battery.bin",
+  "size": 856320,
+  "md5": "a3f5c8d1e9b2f4a6c8e1d3f5a7b9c2e4",
+  "changelog": "Fix crítico en calibración del sensor de corriente",
+  "enabled": true,
+  "rolloutPercentage": 100,
+  "targetDevices": [],
+  "minVersion": "1.0.0"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "message": "Firmware registrado exitosamente",
+  "data": {
+    "_id": "65f8a9b7c8d1e9f2a3b4c5d6",
+    "device": "BATTERY",
+    "version": "1.0.1",
+    "enabled": true
+  }
+}
+```
+
+#### GET /api/ota/versions
+Lista todas las versiones de firmware registradas.
+
+**Query Parameters:**
+- `device` (opcional): Filtrar por tipo de dispositivo
+
+**Ejemplo:**
+```
+GET /api/ota/versions?device=battery
+```
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "count": 2,
+  "data": [
+    {
+      "_id": "...",
+      "device": "BATTERY",
+      "version": "1.0.1",
+      "filename": "battery.bin",
+      "enabled": true,
+      "releaseDate": "2026-03-18T10:30:00.000Z"
+    },
+    {
+      "_id": "...",
+      "device": "BATTERY",
+      "version": "1.0.0",
+      "filename": "battery.bin",
+      "enabled": false,
+      "releaseDate": "2026-03-15T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+#### POST /api/ota/disable
+Deshabilita una versión de firmware. **Requiere contraseña de administrador.**
+
+**Body:**
+```json
+{
+  "password": "ebike2024",
+  "device": "BATTERY",
+  "version": "1.0.0"
+}
+```
+
+#### GET /firmware/version.json
+Obtiene metadata de las versiones disponibles (usado por ESP32).
+
+**Respuesta:**
+```json
+{
+  "battery": {
+    "version": "1.0.1",
+    "device": "BATTERY",
+    "filename": "battery.bin",
+    "size": 856320,
+    "md5": "a3f5c8d1e9b2f4a6c8e1d3f5a7b9c2e4",
+    "date": "2026-03-18",
+    "changelog": "Fix crítico en calibración"
+  },
+  "mainboard": {
+    "version": "1.0.0",
+    "device": "MAINBOARD",
+    "filename": "mainboard.bin",
+    "size": 1024768,
+    "md5": "...",
+    "date": "2026-03-15",
+    "changelog": "Versión inicial"
+  }
+}
+```
+
+#### GET /firmware/{filename}
+Descarga el archivo binario de firmware.
+
+**Ejemplos:**
+- `GET /firmware/battery.bin`
+- `GET /firmware/mainboard.bin`
+
+### Script Helper para Registro de Firmware
+
+Usa el script `register-firmware.js` para simplificar el proceso:
+
+```bash
+node register-firmware.js battery 1.0.1 ./battery.bin "Fix de sensor de corriente"
+```
+
+El script automáticamente:
+- Calcula MD5
+- Obtiene tamaño del archivo
+- Copia el archivo a `firmware/`
+- Registra en la base de datos
+- Actualiza `version.json`
+
+### Rollout Gradual
+
+Controla el despliegue de actualizaciones:
+
+```json
+{
+  "rolloutPercentage": 50,  // Solo 50% de los dispositivos se actualizarán
+  "targetDevices": ["eBikeBattery_01", "eBikeBattery_02"]  // Solo estos dispositivos
+}
+```
+
+### Documentación Adicional
+
+- 📘 **[firmware/README.md](firmware/README.md)** - Guía completa de gestión de firmware
+- 🧪 **[OTA-TESTING.md](OTA-TESTING.md)** - Ejemplos de testing con curl/Postman
+- 🔧 **[register-firmware.js](register-firmware.js)** - Script helper para registrar firmware
+
+---
+
 **Respuesta exitosa:**
 ```json
 {

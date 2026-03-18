@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X, Clock } from "lucide-react"
+import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X, Clock, Upload, Download, Zap } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
 import { useBatteryData } from "@/hooks/use-battery-data"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 
 function formatRelativeTime(date: Date): string {
   const now = new Date()
@@ -73,6 +75,14 @@ export function SettingsModal() {
   const [loading, setLoading] = useState(false)
   const [password, setPassword] = useState("")
   const [showPasswordInput, setShowPasswordInput] = useState(false)
+  
+  // Estados para OTA upload
+  const [firmwareFile, setFirmwareFile] = useState<File | null>(null)
+  const [deviceType, setDeviceType] = useState<string>("battery")
+  const [changelog, setChangelog] = useState<string>("")
+  const [uploadingFirmware, setUploadingFirmware] = useState(false)
+  const [nextVersion, setNextVersion] = useState<string>("")
+  const [currentVersion, setCurrentVersion] = useState<string>("")
 
   // Cargar configuración al abrir el modal
   useEffect(() => {
@@ -194,6 +204,122 @@ export function SettingsModal() {
         }
       }
     })
+  }
+
+  // Obtener próxima versión cuando cambia el tipo de dispositivo
+  useEffect(() => {
+    if (deviceType && open) {
+      fetchNextVersion()
+    }
+  }, [deviceType, open])
+
+  const fetchNextVersion = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'
+      const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      const endpoint = isDevelopment 
+        ? `${apiUrl}/api/ota/next-version?device=${deviceType}` 
+        : `/api/ota/next-version?device=${deviceType}`
+      
+      const response = await fetch(endpoint)
+      const data = await response.json()
+      
+      if (data.success) {
+        setNextVersion(data.nextVersion)
+        setCurrentVersion(data.currentVersion)
+      }
+    } catch (err) {
+      console.error('Error fetching next version:', err)
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.name.endsWith('.bin')) {
+        setFirmwareFile(file)
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Solo se permiten archivos .bin",
+        })
+      }
+    }
+  }
+
+  const handleFirmwareUpload = async () => {
+    if (!firmwareFile) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Por favor selecciona un archivo .bin",
+      })
+      return
+    }
+
+    if (!password) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Por favor ingresa la contraseña de administrador",
+      })
+      setShowPasswordInput(true)
+      return
+    }
+
+    try {
+      setUploadingFirmware(true)
+
+      const formData = new FormData()
+      formData.append('firmware', firmwareFile)
+      formData.append('device', deviceType)
+      formData.append('password', password)
+      formData.append('changelog', changelog || `Actualización ${nextVersion}`)
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'
+      const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      const endpoint = isDevelopment ? `${apiUrl}/api/ota/upload` : '/api/ota/upload'
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "✅ Firmware Subido",
+          description: `Versión ${data.data.version} registrada exitosamente`,
+          className: "border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100",
+        })
+        
+        // Limpiar formulario
+        setFirmwareFile(null)
+        setChangelog("")
+        const fileInput = document.getElementById('firmware-file') as HTMLInputElement
+        if (fileInput) fileInput.value = ''
+        
+        // Actualizar próxima versión
+        await fetchNextVersion()
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: data.error || 'Error al subir el firmware',
+        })
+      }
+    } catch (err) {
+      console.error('Error uploading firmware:', err)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Error al conectar con el servidor",
+      })
+    } finally {
+      setUploadingFirmware(false)
+    }
   }
 
   return (
@@ -440,6 +566,114 @@ export function SettingsModal() {
               <Switch id="connection-alert" disabled={true} />
             </div>
           </div>
+
+          <Separator />
+
+          {/* Actualización de Firmware OTA */}
+          <div className="space-y-4">
+            <h3 className="flex items-center gap-2 font-semibold">
+              <Zap className="h-4 w-4" />
+              Actualización de Firmware (OTA)
+            </h3>
+
+            <div className="space-y-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
+              {/* Selector de dispositivo */}
+              <div className="space-y-2">
+                <Label htmlFor="device-type">Tipo de Dispositivo</Label>
+                <Select value={deviceType} onValueChange={setDeviceType}>
+                  <SelectTrigger id="device-type">
+                    <SelectValue placeholder="Selecciona dispositivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="battery">
+                      <div className="flex items-center gap-2">
+                        <Battery className="h-4 w-4" />
+                        <span>Batería (ESP32-C3)</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="mainboard">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-4 w-4" />
+                        <span>Mainboard (ESP32-S2)</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Información de versiones */}
+              <div className="grid grid-cols-2 gap-3 rounded-md bg-background/50 p-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Versión Actual</p>
+                  <p className="font-mono text-sm font-semibold">{currentVersion || '---'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Próxima Versión</p>
+                  <p className="font-mono text-sm font-semibold text-green-600 dark:text-green-400">
+                    {nextVersion || '---'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Selector de archivo */}
+              <div className="space-y-2">
+                <Label htmlFor="firmware-file">Archivo de Firmware (.bin)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="firmware-file"
+                    type="file"
+                    accept=".bin"
+                    onChange={handleFileChange}
+                    className="cursor-pointer"
+                  />
+                  {firmwareFile && (
+                    <div className="flex items-center gap-1 rounded-md bg-green-50 px-3 text-xs text-green-700 dark:bg-green-950 dark:text-green-400">
+                      <Download className="h-3 w-3" />
+                      {(firmwareFile.size / 1024).toFixed(1)} KB
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {firmwareFile ? `Seleccionado: ${firmwareFile.name}` : 'Selecciona un archivo .bin compilado'}
+                </p>
+              </div>
+
+              {/* Changelog */}
+              <div className="space-y-2">
+                <Label htmlFor="changelog">Notas de la Versión (Opcional)</Label>
+                <Textarea
+                  id="changelog"
+                  placeholder="Fix de bug en sensor de corriente, mejoras de rendimiento..."
+                  value={changelog}
+                  onChange={(e) => setChangelog(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Describe los cambios de esta actualización
+                </p>
+              </div>
+
+              {/* Botón de subir */}
+              <Button
+                onClick={handleFirmwareUpload}
+                disabled={uploadingFirmware || !firmwareFile}
+                className="w-full"
+                variant="default"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {uploadingFirmware ? 'Subiendo...' : `Subir Firmware v${nextVersion}`}
+              </Button>
+
+              <div className="rounded-md bg-blue-50 p-3 dark:bg-blue-950/20">
+                <p className="text-xs text-blue-800 dark:text-blue-400">
+                  ℹ️ El versionado es <strong>autoincremental</strong>. La versión se asigna automáticamente basándose en la última versión registrada (+1 en patch).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
 
           {/* Contraseña y botón de guardar */}
           {showPasswordInput && (

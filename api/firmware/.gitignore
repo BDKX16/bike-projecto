@@ -1,0 +1,6 @@
+# Ignorar archivos binarios de firmware
+*.bin
+
+# Mantener version.json y README.md
+!version.json
+!README.md

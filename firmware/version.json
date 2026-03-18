@@ -1,0 +1,20 @@
+{
+  "battery": {
+    "version": "1.0.0",
+    "device": "BATTERY",
+    "filename": "battery.bin",
+    "size": 0,
+    "md5": "",
+    "date": "2026-03-18",
+    "changelog": "Versión inicial con soporte OTA"
+  },
+  "mainboard": {
+    "version": "1.0.0",
+    "device": "MAINBOARD",
+    "filename": "mainboard.bin",
+    "size": 0,
+    "md5": "",
+    "date": "2026-03-18",
+    "changelog": "Versión inicial con soporte OTA"
+  }
+}

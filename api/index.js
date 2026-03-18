@@ -4,6 +4,7 @@ const cors = require("cors");
 const BikeData = require("./models/bikeData");
 const Settings = require("./models/settings");
 const { analyzeBatteryStatus, sendAlertEmail, sendChargeCompleteEmail } = require("./services/alertService");
+const otaService = require("./services/otaService");
 
 require("dotenv").config();
 
@@ -64,7 +65,8 @@ app.post("/api/battery", async (req, res) => {
   try {
     const { 
       device, 
-      name, 
+      name,
+      firmwareVersion, 
       voltage, 
       current, 
       percent, 
@@ -176,22 +178,39 @@ app.post("/api/battery", async (req, res) => {
           }
         }
       }
+
+      // Verificar actualización OTA
+      let otaUpdate = { updateAvailable: false };
+      if (firmwareVersion) {
+        otaUpdate = await otaService.checkForUpdate('battery', firmwareVersion, device);
+      }
       
       return res.status(201).json({ 
+        status: 'ok',
         success: true, 
         data: bikeData,
         alerts: alerts.length > 0 ? alerts : undefined,
-        emailSent
+        emailSent,
+        ...otaUpdate,
+        receivedAt: new Date().toISOString()
       });
     }
     
-    // Si está cargando, solo devolver los datos
+    // Si está cargando, incluir verificación OTA
+    let otaUpdate = { updateAvailable: false };
+    if (firmwareVersion) {
+      otaUpdate = await otaService.checkForUpdate('battery', firmwareVersion, device);
+    }
+
     res.status(201).json({ 
+      status: 'ok',
       success: true, 
       data: bikeData,
       charging: true,
       emailSent,
-      percentAlerts: percentAlerts.length > 0 ? percentAlerts : undefined
+      percentAlerts: percentAlerts.length > 0 ? percentAlerts : undefined,
+      ...otaUpdate,
+      receivedAt: new Date().toISOString()
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -293,6 +312,288 @@ app.post("/api/settings", async (req, res) => {
 // Health check
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
+});
+
+// ==================== OTA ENDPOINTS ====================
+
+// Servir archivos estáticos de firmware
+const path = require('path');
+const multer = require('multer');
+const crypto = require('crypto');
+const fs = require('fs').promises;
+
+const firmwarePath = process.env.FIRMWARE_PATH || path.join(__dirname, 'firmware');
+app.use('/firmware', express.static(firmwarePath));
+
+// Configurar multer para upload de firmware
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, firmwarePath);
+  },
+  filename: function (req, file, cb) {
+    // El nombre se establecerá después según el tipo de dispositivo
+    cb(null, file.originalname);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    if (file.originalname.endsWith('.bin')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos .bin'));
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB máximo
+  }
+});
+
+// GET - version.json (metadata de versiones disponibles)
+app.get('/firmware/version.json', async (req, res) => {
+  try {
+    const versionFile = path.join(firmwarePath, 'version.json');
+    res.sendFile(versionFile);
+  } catch (error) {
+    console.error('Error al servir version.json:', error);
+    res.status(404).json({ success: false, error: 'version.json no encontrado' });
+  }
+});
+
+// GET - Verificar actualización (alternativa al POST /api/battery)
+app.get('/api/ota/check-update', async (req, res) => {
+  try {
+    const { device, version, deviceId } = req.query;
+    
+    if (!device || !version) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Parámetros requeridos: device, version' 
+      });
+    }
+
+    const updateInfo = await otaService.checkForUpdate(device, version, deviceId);
+    
+    res.json({
+      success: true,
+      ...updateInfo
+    });
+  } catch (error) {
+    console.error('Error al verificar actualización:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST - Registrar nueva versión de firmware (requiere autenticación)
+app.post('/api/ota/register', async (req, res) => {
+  try {
+    const { password, ...firmwareData } = req.body;
+    
+    // Verificar contraseña
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ebike2024";
+    
+    if (!password || password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Contraseña incorrecta" 
+      });
+    }
+
+    const firmware = await otaService.registerFirmware(firmwareData);
+    
+    res.json({
+      success: true,
+      message: 'Firmware registrado exitosamente',
+      data: firmware
+    });
+  } catch (error) {
+    console.error('Error al registrar firmware:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET - Listar todas las versiones disponibles
+app.get('/api/ota/versions', async (req, res) => {
+  try {
+    const { device } = req.query;
+    const versions = await otaService.getAllVersions(device);
+    
+    res.json({
+      success: true,
+      count: versions.length,
+      data: versions
+    });
+  } catch (error) {
+    console.error('Error al obtener versiones:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST - Deshabilitar versión de firmware
+app.post('/api/ota/disable', async (req, res) => {
+  try {
+    const { password, version, device } = req.body;
+    
+    // Verificar contraseña
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ebike2024";
+    
+    if (!password || password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Contraseña incorrecta" 
+      });
+    }
+
+    if (!version || !device) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Parámetros requeridos: version, device" 
+      });
+    }
+
+    const disabled = await otaService.disableFirmware(version, device);
+    
+    if (disabled) {
+      res.json({
+        success: true,
+        message: `Firmware ${device} v${version} deshabilitado`
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        error: 'Firmware no encontrado'
+      });
+    }
+  } catch (error) {
+    console.error('Error al deshabilitar firmware:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST - Actualizar version.json manualmente
+app.post('/api/ota/refresh-version-json', async (req, res) => {
+  try {
+    const { password } = req.body;
+    
+    // Verificar contraseña
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ebike2024";
+    
+    if (!password || password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Contraseña incorrecta" 
+      });
+    }
+
+    await otaService.updateVersionJson();
+    
+    res.json({
+      success: true,
+      message: 'version.json actualizado exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al actualizar version.json:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST - Upload de firmware (con versionado autoincremental)
+app.post('/api/ota/upload', upload.single('firmware'), async (req, res) => {
+  try {
+    const { password, device, changelog } = req.body;
+    
+    // Verificar contraseña
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ebike2024";
+    
+    if (!password || password !== ADMIN_PASSWORD) {
+      // Eliminar archivo si la contraseña es incorrecta
+      if (req.file) {
+        await fs.unlink(req.file.path).catch(err => console.error('Error al eliminar archivo:', err));
+      }
+      return res.status(401).json({ 
+        success: false, 
+        error: "Contraseña incorrecta" 
+      });
+    }
+
+    // Verificar que se subió un archivo
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "No se recibió ningún archivo" 
+      });
+    }
+
+    // Verificar tipo de dispositivo
+    if (!device || !['battery', 'mainboard'].includes(device.toLowerCase())) {
+      await fs.unlink(req.file.path).catch(err => console.error('Error al eliminar archivo:', err));
+      return res.status(400).json({ 
+        success: false, 
+        error: "Tipo de dispositivo inválido. Debe ser 'battery' o 'mainboard'" 
+      });
+    }
+
+    console.log(`📤 Upload de firmware recibido:`);
+    console.log(`   Dispositivo: ${device}`);
+    console.log(`   Archivo: ${req.file.originalname}`);
+    console.log(`   Tamaño: ${(req.file.size / 1024).toFixed(2)} KB`);
+
+    // Procesar el upload con versionado autoincremental
+    const firmware = await otaService.uploadFirmware(
+      device.toLowerCase(),
+      req.file.path,
+      changelog || ''
+    );
+
+    res.json({
+      success: true,
+      message: 'Firmware subido y registrado exitosamente',
+      data: {
+        version: firmware.version,
+        device: firmware.device,
+        size: firmware.size,
+        md5: firmware.md5,
+        changelog: firmware.changelog
+      }
+    });
+  } catch (error) {
+    console.error('Error al subir firmware:', error);
+    
+    // Intentar eliminar el archivo si hubo error
+    if (req.file) {
+      await fs.unlink(req.file.path).catch(err => console.error('Error al eliminar archivo:', err));
+    }
+    
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET - Obtener próxima versión (para preview en frontend)
+app.get('/api/ota/next-version', async (req, res) => {
+  try {
+    const { device } = req.query;
+    
+    if (!device || !['battery', 'mainboard'].includes(device.toLowerCase())) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Tipo de dispositivo inválido" 
+      });
+    }
+
+    const nextVersion = await otaService.getNextVersion(device.toLowerCase());
+    const currentFirmware = await otaService.getAllVersions(device.toLowerCase());
+    const latestVersion = currentFirmware.length > 0 ? currentFirmware[0].version : 'Ninguna';
+
+    res.json({
+      success: true,
+      currentVersion: latestVersion,
+      nextVersion: nextVersion
+    });
+  } catch (error) {
+    console.error('Error al obtener próxima versión:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Server
