@@ -220,7 +220,7 @@ export function BatteryHistoryChart({ className = "", isOpen, onOpenChange }: Ba
           </div>
           
           {/* Referencias de colores - Solo en mobile */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 border-t border-border/30 pt-3 md:hidden">
+          <div className="mt-4020 flex flex-wrap items-center justify-center gap-3 border-t border-border/30 pt-3 md:hidden">
             <div className="flex items-center gap-1.5">
               <div className="h-2 w-2 rounded-full" style={{ backgroundColor: "hsl(199, 89%, 48%)" }} />
               <span className="font-mono text-xs text-muted-foreground">Normal</span>

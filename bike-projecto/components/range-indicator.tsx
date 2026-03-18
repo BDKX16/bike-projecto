@@ -40,7 +40,7 @@ export function RangeIndicator({ data }: RangeIndicatorProps) {
   const color = getColor()
 
   return (
-    <div className="liquid-glass relative z-10 mx-auto mt-6 w-full max-w-2xl rounded-2xl p-6">
+    <div className="liquid-glass relative z-10 mx-auto mt-6 w-full max-w-2xl rounded-2xl p-6 md:mt-0">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Autonomía estimada
