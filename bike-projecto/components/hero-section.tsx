@@ -93,7 +93,7 @@ export function HeroSection({ data, isStale, lastUpdate }: HeroSectionProps) {
       </div>
 
       {/* Container for overlapping History Chart and Stats */}
-      <div className="relative z-10 w-full max-w-2xl" style={{ minHeight: '200px' }}>
+      <div className="relative z-10 w-full max-w-2xl" style={{ minHeight: '168px' }}>
         {/* Battery History Chart - Overlayed */}
         <div 
           className="absolute inset-0 overflow-hidden transition-all duration-300 ease-in-out"

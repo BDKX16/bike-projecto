@@ -164,29 +164,8 @@ export function BatteryHistoryChart({ className = "", isOpen, onOpenChange }: Ba
           <p className="text-xs text-muted-foreground">{error}</p>
         </div>
       ) : (
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={historyData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-            <XAxis 
-              dataKey="time" 
-              stroke="hsl(var(--muted-foreground))"
-              fontSize={10}
-              tickMargin={5}
-              interval="preserveStartEnd"
-              tickFormatter={(value, index) => {
-                // Mostrar solo algunas etiquetas para evitar aglomeración
-                if (index % 8 === 0 || index === historyData.length - 1) {
-                  return value
-                }
-                return ""
-              }}
-            />
-            <YAxis 
-              stroke="hsl(var(--muted-foreground))"
-              fontSize={10}
-              tickFormatter={(value) => `${value}%`}
-              domain={[0, 100]}
-            />
+        <ResponsiveContainer width="100%" height={140}>
+          <BarChart data={historyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
             <Bar 
               dataKey="percent" 
               radius={[4, 4, 0, 0]}
