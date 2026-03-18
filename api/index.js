@@ -12,30 +12,34 @@ const app = express();
 // Middlewares
 app.use(express.json());
 
-// Configuración de CORS
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Permitir requests sin origin (como mobile apps o curl)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'https://bike.xaviergalarreta.pro',
-      'http://localhost:3000',
-      'http://localhost:3121',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:3121'
-    ];
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-};
-
-app.use(cors(corsOptions));
+// CORS solo en desarrollo local (en producción lo maneja nginx)
+if (process.env.NODE_ENV !== 'production') {
+  const corsOptions = {
+    origin: function (origin, callback) {
+      // Permitir requests sin origin (como mobile apps o curl)
+      if (!origin) return callback(null, true);
+      
+      const allowedOrigins = [
+        'http://localhost:3000',
+        'http://localhost:3121',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3121'
+      ];
+      
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true
+  };
+  
+  app.use(cors(corsOptions));
+  console.log('🔓 CORS habilitado para desarrollo local');
+} else {
+  console.log('🔒 CORS deshabilitado (manejado por nginx)');
+}
 
 // MongoDB Connection
 const mongoUri = `mongodb://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@${process.env.MONGO_HOST}:${process.env.MONGO_PORT}/${process.env.MONGO_DATABASE}?authSource=admin`;
