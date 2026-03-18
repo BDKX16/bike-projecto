@@ -6,9 +6,10 @@ interface BatteryGaugeProps {
   percentage: number
   charging: boolean
   name: string
+  onClick?: () => void
 }
 
-export function BatteryGauge({ percentage, charging, name }: BatteryGaugeProps) {
+export function BatteryGauge({ percentage, charging, name, onClick }: BatteryGaugeProps) {
   const [displayValue, setDisplayValue] = useState(0)
   const [animatedPercentage, setAnimatedPercentage] = useState(0)
   const [mounted, setMounted] = useState(false)
@@ -66,7 +67,13 @@ export function BatteryGauge({ percentage, charging, name }: BatteryGaugeProps) 
 
   return (
     <div className="relative flex flex-col items-center">
-      <div className="relative h-56 w-56 md:h-72 md:w-72" style={{ overflow: "visible" }}>
+      <div 
+        className={`relative h-56 w-56 md:h-72 md:w-72 ${onClick ? 'cursor-pointer transition-transform hover:scale-105' : ''}`}
+        style={{ overflow: "visible" }}
+        onClick={onClick}
+        role={onClick ? "button" : undefined}
+        aria-label={onClick ? "Ver historial de batería" : undefined}
+      >
         <svg
           className="-rotate-90 h-full w-full"
           viewBox="0 0 200 200"

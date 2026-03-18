@@ -6,6 +6,21 @@
   .text-balance {
     text-wrap: balance;
   }
+  
+  @keyframes slideInFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-slide-in-fade {
+    animation: slideInFadeIn 0.3s ease-out;
+  }
 }
 
 @layer base {

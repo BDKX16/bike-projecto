@@ -98,6 +98,48 @@ Obtiene el último registro guardado.
 }
 ```
 
+### GET /api/bike-data/history
+Obtiene el historial de registros de telemetría.
+
+**Query Parameters:**
+- `hours` (opcional): Número de horas hacia atrás. Por defecto: 24
+- `limit` (opcional): Máximo número de registros. Por defecto: 1000
+
+**Ejemplo:**
+```
+GET /api/bike-data/history?hours=24&limit=500
+```
+
+**Respuesta:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "...",
+      "device": "eBikeBattery",
+      "voltage": 38.45,
+      "percent": 75.3,
+      "charging": false,
+      "timestamp": "2026-02-12T10:00:00.000Z"
+    },
+    {
+      "_id": "...",
+      "device": "eBikeBattery",
+      "voltage": 38.52,
+      "percent": 76.1,
+      "charging": false,
+      "timestamp": "2026-02-12T10:30:00.000Z"
+    }
+  ],
+  "count": 2,
+  "range": {
+    "from": "2026-02-11T10:00:00.000Z",
+    "to": "2026-02-12T10:30:00.000Z"
+  }
+}
+```
+
 ### GET /api/settings
 Obtiene la configuración actual de notificaciones y alertas.
 

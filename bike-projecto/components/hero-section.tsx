@@ -1,9 +1,11 @@
 "use client"
 
+import { useState } from "react"
 import { ChevronDown, Zap, Timer } from "lucide-react"
 import { BatteryGauge } from "./battery-gauge"
 import { BatteryStats } from "./battery-stats"
 import { RangeIndicator } from "./range-indicator"
+import { BatteryHistoryChart } from "./battery-history-chart"
 import type { BikeData } from "@/lib/bike-data"
 
 interface HeroSectionProps {
@@ -50,6 +52,7 @@ function calculateChargingTime(data: BikeData): string | null {
 }
 
 export function HeroSection({ data, isStale, lastUpdate }: HeroSectionProps) {
+  const [historyOpen, setHistoryOpen] = useState(false)
   const estimatedTime = calculateChargingTime(data)
   
   return (
@@ -80,17 +83,42 @@ export function HeroSection({ data, isStale, lastUpdate }: HeroSectionProps) {
       </div>
 
       {/* Battery Gauge */}
-      <div className="relative z-10 mb-10 animate-float">
+      <div className="relative z-10 mb-4 animate-float md:mb-6">
         <BatteryGauge
           percentage={data.percent}
           charging={data.charging}
           name={data.name || data.device}
+          onClick={() => setHistoryOpen(!historyOpen)}
         />
       </div>
 
-      {/* Stats grid */}
-      <div className="relative z-10 w-full max-w-2xl">
-        <BatteryStats data={data} />
+      {/* Container for overlapping History Chart and Stats */}
+      <div className="relative z-10 w-full max-w-2xl" style={{ minHeight: '200px' }}>
+        {/* Battery History Chart - Overlayed */}
+        <div 
+          className="absolute inset-0 overflow-hidden transition-all duration-300 ease-in-out"
+          style={{
+            opacity: historyOpen ? 1 : 0,
+            maxHeight: historyOpen ? '300px' : '0px',
+            pointerEvents: historyOpen ? 'auto' : 'none'
+          }}
+        >
+          <BatteryHistoryChart 
+            isOpen={historyOpen}
+            onOpenChange={setHistoryOpen}
+          />
+        </div>
+
+        {/* Stats grid - Overlayed */}
+        <div 
+          className="transition-opacity duration-300 ease-in-out"
+          style={{
+            opacity: historyOpen ? 0 : 1,
+            pointerEvents: historyOpen ? 'none' : 'auto'
+          }}
+        >
+          <BatteryStats data={data} />
+        </div>
       </div>
 
       {/* Range indicator - solo cuando no está cargando */}
