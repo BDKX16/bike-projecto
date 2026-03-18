@@ -68,9 +68,18 @@ function fillGaps(data: BatteryHistoryData[]): BatteryHistoryData[] {
 }
 
 // Función para determinar el color según el porcentaje
-function getBarColor(percent: number, charging: boolean): string {
-  if (charging) {
+function getBarColor(percent: number, charging: boolean, prevPercent?: number): string {
+  // Debug: descomentar para ver los valores
+  // console.log('Bar color - percent:', percent, 'charging:', charging, 'prev:', prevPercent)
+  
+  // Si charging está explícitamente true, usar verde
+  if (charging === true) {
     return "hsl(160, 80%, 48%)" // Verde brillante cuando está cargando
+  }
+  
+  // Inferir carga si el porcentaje subió significativamente
+  if (prevPercent !== undefined && percent > prevPercent + 0.5) {
+    return "hsl(160, 80%, 48%)" // Verde brillante
   }
   
   if (percent < 20) {
@@ -118,6 +127,12 @@ export function BatteryHistoryChart({ className = "", isOpen, onOpenChange }: Ba
             minute: "2-digit" 
           })
         }))
+
+        console.log('Sample data points:', transformedData.slice(0, 5).map(d => ({ 
+          time: d.time, 
+          percent: d.percent, 
+          charging: d.charging 
+        })))
 
         // Rellenar huecos
         const filledData = fillGaps(transformedData)
@@ -174,8 +189,9 @@ export function BatteryHistoryChart({ className = "", isOpen, onOpenChange }: Ba
                   radius={[4, 4, 0, 0]}
                   isAnimationActive={false}
                   shape={(props: any) => {
-                    const { x, y, width, height, payload } = props
-                    const fill = getBarColor(payload.percent, payload.charging)
+                    const { x, y, width, height, payload, index } = props
+                    const prevPayload = index > 0 ? historyData[index - 1] : null
+                    const fill = getBarColor(payload.percent, payload.charging, prevPayload?.percent)
                     return (
                       <rect
                         x={x}
@@ -201,8 +217,9 @@ export function BatteryHistoryChart({ className = "", isOpen, onOpenChange }: Ba
                   radius={[4, 4, 0, 0]}
                   isAnimationActive={false}
                   shape={(props: any) => {
-                    const { x, y, width, height, payload } = props
-                    const fill = getBarColor(payload.percent, payload.charging)
+                    const { x, y, width, height, payload, index } = props
+                    const prevPayload = index > 0 ? historyData[index - 1] : null
+                    const fill = getBarColor(payload.percent, payload.charging, prevPayload?.percent)
                     return (
                       <rect
                         x={x}
