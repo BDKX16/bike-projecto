@@ -213,6 +213,34 @@ app.get("/api/bike-data/latest", async (req, res) => {
   }
 });
 
+// GET - Obtener historial de las últimas 24 horas
+app.get("/api/bike-data/history", async (req, res) => {
+  try {
+    const hours = parseInt(req.query.hours) || 24;
+    const limit = parseInt(req.query.limit) || 1000;
+    
+    const since = new Date();
+    since.setHours(since.getHours() - hours);
+    
+    const historyData = await BikeData.find({ 
+      timestamp: { $gte: since } 
+    })
+    .sort({ timestamp: 1 })
+    .limit(limit)
+    .lean();
+    
+    res.json({ 
+      success: true, 
+      data: historyData,
+      count: historyData.length,
+      range: { from: since, to: new Date() }
+    });
+  } catch (error) {
+    console.error('Error al obtener historial:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET - Obtener configuración
 app.get("/api/settings", async (req, res) => {
   try {
