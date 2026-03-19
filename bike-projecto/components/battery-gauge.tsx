@@ -50,8 +50,8 @@ export function BatteryGauge({ percentage, charging, name, onClick }: BatteryGau
     
     // Batería en uso
     if (percentage >= 60) return "hsl(199, 89%, 48%)" // Azul - Buena
-    if (percentage >= 40) return "hsl(45, 90%, 55%)" // Amarillo - Media
-    if (percentage >= 15) return "hsl(25, 90%, 55%)" // Naranja - Baja
+    if (percentage >= 30) return "hsl(45, 90%, 55%)" // Amarillo - Advertencia/Bajo
+    if (percentage >= 15) return "hsl(25, 90%, 55%)" // Naranja - Muy Baja
     return "hsl(0, 80%, 55%)" // Rojo - Crítica
   }
 
@@ -60,8 +60,8 @@ export function BatteryGauge({ percentage, charging, name, onClick }: BatteryGau
     if (charging) return "Cargando"
     if (percentage >= 80) return "Excelente"
     if (percentage >= 60) return "Buena"
-    if (percentage >= 40) return "Media"
-    if (percentage >= 15) return "Baja"
+    if (percentage >= 30) return "Advertencia"
+    if (percentage >= 15) return "Muy Baja"
     return "¡Crítica!"
   }
 

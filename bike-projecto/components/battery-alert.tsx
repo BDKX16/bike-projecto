@@ -54,14 +54,27 @@ export function BatteryAlert({ data }: BatteryAlertProps) {
     )
   }
 
-  // Batería media-baja (25-40%)
-  if (percent < 40 && !charging) {
+  // Batería media-baja (25-30%)
+  if (percent < 30 && percent >= 25 && !charging) {
     return (
       <Alert className="border-yellow-500/50 bg-yellow-500/10">
         <AlertTriangle className="h-5 w-5 text-yellow-500" />
-        <AlertTitle className="text-yellow-500">Planifica una Recarga</AlertTitle>
+        <AlertTitle className="text-yellow-500">Nivel Bajo - Planifica una Recarga</AlertTitle>
         <AlertDescription className="text-yellow-300/80">
           La batería está al {percent.toFixed(1)}%. Las baterías de litio duran más si evitas descargas profundas.
+        </AlertDescription>
+      </Alert>
+    )
+  }
+
+  // Batería en advertencia (30-40%)
+  if (percent < 40 && percent >= 30 && !charging) {
+    return (
+      <Alert className="border-yellow-500/50 bg-yellow-500/10">
+        <AlertTriangle className="h-5 w-5 text-yellow-500" />
+        <AlertTitle className="text-yellow-500">Advertencia</AlertTitle>
+        <AlertDescription className="text-yellow-300/80">
+          La batería está al {percent.toFixed(1)}%. Considera cargar pronto.
         </AlertDescription>
       </Alert>
     )

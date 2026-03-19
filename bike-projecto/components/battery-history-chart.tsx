@@ -82,11 +82,11 @@ function getBarColor(percent: number, charging: boolean, prevPercent?: number): 
     return "hsl(160, 80%, 48%)" // Verde brillante
   }
   
-  if (percent < 20) {
-    return "hsl(0, 85%, 60%)" // Rojo para nivel crítico
-  }
-  
-  return "hsl(199, 89%, 48%)" // Azul del tema (color primario)
+  // Mantener colores consistentes con el gauge
+  if (percent >= 60) return "hsl(199, 89%, 48%)" // Azul - Buena
+  if (percent >= 30) return "hsl(45, 90%, 55%)" // Amarillo - Advertencia/Bajo
+  if (percent >= 15) return "hsl(25, 90%, 55%)" // Naranja - Muy Baja
+  return "hsl(0, 80%, 55%)" // Rojo - Crítica
 }
 
 export function BatteryHistoryChart({ className = "", isOpen, onOpenChange }: BatteryHistoryChartProps) {
