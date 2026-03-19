@@ -32,6 +32,7 @@ export function RangeIndicator({ data }: RangeIndicatorProps) {
   // Determinar color según el rango
   const getColor = () => {
     if (estimatedKm >= maxKm * 0.6) return "hsl(199, 89%, 48%)" // Azul
+    if (estimatedKm >= maxKm * 0.4) return "hsl(199, 89%, 48%)" // Azul
     if (estimatedKm >= maxKm * 0.3) return "hsl(45, 90%, 55%)" // Amarillo
     if (estimatedKm >= maxKm * 0.15) return "hsl(25, 90%, 55%)" // Naranja
     return "hsl(0, 80%, 55%)" // Rojo

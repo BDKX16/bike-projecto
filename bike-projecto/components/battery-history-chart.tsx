@@ -84,7 +84,8 @@ function getBarColor(percent: number, charging: boolean, prevPercent?: number): 
   
   // Mantener colores consistentes con el gauge
   if (percent >= 60) return "hsl(199, 89%, 48%)" // Azul - Buena
-  if (percent >= 30) return "hsl(45, 90%, 55%)" // Amarillo - Advertencia/Bajo
+  if (percent >= 40) return "hsl(199, 89%, 48%)" // Azul - Media
+  if (percent >= 30) return "hsl(45, 90%, 55%)" // Amarillo - Bajo
   if (percent >= 15) return "hsl(25, 90%, 55%)" // Naranja - Muy Baja
   return "hsl(0, 80%, 55%)" // Rojo - Crítica
 }
