@@ -17,15 +17,19 @@ class OTAService {
    */
   async checkForUpdate(deviceType, currentVersion, deviceId = null) {
     try {
+      console.log(`  ├─ [OTA Service] Consultando BD para ${deviceType.toUpperCase()}...`);
       const updateInfo = await FirmwareVersion.checkUpdate(deviceType, currentVersion);
       
       if (!updateInfo.updateAvailable) {
+        console.log(`  ├─ [OTA Service] No hay versión más nueva`);
         return {
           updateAvailable: false,
           currentVersion,
           latestVersion: updateInfo.latestVersion || currentVersion
         };
       }
+      
+      console.log(`  ├─ [OTA Service] Nueva versión encontrada: ${updateInfo.latestVersion}`);
 
       // Si hay actualización disponible, verificar rollout y target devices
       const latestFirmware = await FirmwareVersion.getLatestVersion(deviceType);
@@ -61,7 +65,7 @@ class OTAService {
 
       // Verificar versión mínima requerida
       if (this.compareVersions(currentVersion, latestFirmware.minVersion) < 0) {
-        console.log(`⚠️ Versión ${currentVersion} demasiado antigua para actualizar directamente`);
+        console.log(`  ├─ [OTA Service] ⚠️ Versión ${currentVersion} demasiado antigua (min: ${latestFirmware.minVersion})`);
         return {
           updateAvailable: false,
           currentVersion,
@@ -71,7 +75,8 @@ class OTAService {
         };
       }
 
-      console.log(`🚀 Actualización disponible para ${deviceType}: ${currentVersion} → ${updateInfo.latestVersion}`);
+      console.log(`  ├─ [OTA Service] ✅ Todos los checks pasados`);
+      console.log(`  └─ [OTA Service] 🚀 Actualización autorizada: ${currentVersion} → ${updateInfo.latestVersion}`);
       
       return {
         updateAvailable: true,

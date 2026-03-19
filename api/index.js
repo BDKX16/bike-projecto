@@ -182,7 +182,15 @@ app.post("/api/battery", async (req, res) => {
       // Verificar actualización OTA
       let otaUpdate = { updateAvailable: false };
       if (firmwareVersion) {
+        console.log(`🔍 [OTA] Verificando actualización para ${device} v${firmwareVersion} (NO cargando)`);
         otaUpdate = await otaService.checkForUpdate('battery', firmwareVersion, device);
+        if (otaUpdate.updateAvailable) {
+          console.log(`📥 [OTA] ✅ Actualización disponible: ${firmwareVersion} → ${otaUpdate.newVersion}`);
+        } else {
+          console.log(`✓ [OTA] Sin actualización - Versión actual: ${firmwareVersion}`);
+        }
+      } else {
+        console.log(`⚠️ [OTA] Dispositivo ${device} no envió firmwareVersion`);
       }
       
       return res.status(201).json({ 
@@ -199,7 +207,16 @@ app.post("/api/battery", async (req, res) => {
     // Si está cargando, incluir verificación OTA
     let otaUpdate = { updateAvailable: false };
     if (firmwareVersion) {
+      console.log(`🔍 [OTA] Verificando actualización para ${device} v${firmwareVersion} (CARGANDO)`);
       otaUpdate = await otaService.checkForUpdate('battery', firmwareVersion, device);
+      if (otaUpdate.updateAvailable) {
+        console.log(`📥 [OTA] ✅ Actualización disponible: ${firmwareVersion} → ${otaUpdate.newVersion}`);
+        console.log(`📥 [OTA] URL: /firmware/battery.bin (${(otaUpdate.size / 1024).toFixed(1)} KB)`);
+      } else {
+        console.log(`✓ [OTA] Sin actualización - Versión actual: ${firmwareVersion}`);
+      }
+    } else {
+      console.log(`⚠️ [OTA] Dispositivo ${device} no envió firmwareVersion`);
     }
 
     res.status(201).json({ 
@@ -323,6 +340,25 @@ const crypto = require('crypto');
 const fs = require('fs').promises;
 
 const firmwarePath = process.env.FIRMWARE_PATH || path.join(__dirname, 'firmware');
+
+// Middleware para loggear descargas de firmware
+app.use('/firmware', (req, res, next) => {
+  const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+  
+  if (req.path.endsWith('.bin')) {
+    console.log(`\n📦 [OTA] ========================================`);
+    console.log(`📦 [OTA] DESCARGA DE FIRMWARE`);
+    console.log(`📦 [OTA] Archivo: ${req.path}`);
+    console.log(`📦 [OTA] IP: ${clientIP}`);
+    console.log(`📦 [OTA] User-Agent: ${userAgent}`);
+    console.log(`📦 [OTA] Timestamp: ${new Date().toISOString()}`);
+    console.log(`📦 [OTA] ========================================\n`);
+  }
+  
+  next();
+});
+
 app.use('/firmware', express.static(firmwarePath));
 
 // Configurar multer para upload de firmware
@@ -354,9 +390,11 @@ const upload = multer({
 app.get('/firmware/version.json', async (req, res) => {
   try {
     const versionFile = path.join(firmwarePath, 'version.json');
+    const clientIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    console.log(`📄 [OTA] Descarga de version.json desde ${clientIP}`);
     res.sendFile(versionFile);
   } catch (error) {
-    console.error('Error al servir version.json:', error);
+    console.error('❌ [OTA] Error al servir version.json:', error);
     res.status(404).json({ success: false, error: 'version.json no encontrado' });
   }
 });
