@@ -12,6 +12,7 @@ const bikeDataSchema = new mongoose.Schema({
   maxCycles: { type: Number },
   charging: { type: Boolean, required: true },
   gpioVoltage: { type: Number }, // Voltaje GPIO raw para debug
+  wifiNetworks: { type: [String], default: [] }, // Redes WiFi reportadas por el ESP32
   espTimestamp: { type: Number },
   timestamp: { type: Date, default: Date.now }
 });

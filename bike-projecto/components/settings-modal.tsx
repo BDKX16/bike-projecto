@@ -88,8 +88,11 @@ export function SettingsModal() {
   // Estados para WiFi management
   const [wifiSSID, setWifiSSID] = useState<string>("")
   const [wifiPassword, setWifiPassword] = useState<string>("")
+  const [currentNetworks, setCurrentNetworks] = useState<string[]>([])
+  const [desiredNetworks, setDesiredNetworks] = useState<any[]>([])
   const [pendingWifiCommands, setPendingWifiCommands] = useState<any[]>([])
   const [loadingWifiCommands, setLoadingWifiCommands] = useState(false)
+  const [wifiInSync, setWifiInSync] = useState<boolean | null>(null)
 
   // Cargar configuración al abrir el modal
   useEffect(() => {
@@ -337,18 +340,34 @@ export function SettingsModal() {
       setLoadingWifiCommands(true)
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'
       const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-      const endpoint = isDevelopment 
+      
+      // Obtener redes actuales y deseadas
+      const networksEndpoint = isDevelopment 
+        ? `${apiUrl}/api/wifi/networks/eBikeBattery` 
+        : `/api/wifi/networks/eBikeBattery`
+      
+      const networksResponse = await fetch(networksEndpoint)
+      const networksData = await networksResponse.json()
+      
+      if (networksData.success) {
+        setCurrentNetworks(networksData.data.currentNetworks || [])
+        setDesiredNetworks(networksData.data.desiredNetworks || [])
+        setWifiInSync(networksData.data.inSync)
+      }
+      
+      // También obtener comandos pendientes
+      const commandsEndpoint = isDevelopment 
         ? `${apiUrl}/api/wifi/commands/pending?device=eBikeBattery` 
         : `/api/wifi/commands/pending?device=eBikeBattery`
       
-      const response = await fetch(endpoint)
-      const data = await response.json()
+      const commandsResponse = await fetch(commandsEndpoint)
+      const commandsData = await commandsResponse.json()
       
-      if (data.success) {
-        setPendingWifiCommands(data.data || [])
+      if (commandsData.success) {
+        setPendingWifiCommands(commandsData.data || [])
       }
     } catch (err) {
-      console.error('Error fetching pending WiFi commands:', err)
+      console.error('Error fetching WiFi data:', err)
     } finally {
       setLoadingWifiCommands(false)
     }
@@ -737,7 +756,7 @@ export function SettingsModal() {
                 </div>
               </AccordionTrigger>
               <AccordionContent>
-                <div className="space-y-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <div className="space-y-4 rounded-lg border bg-background p-4">
                   {/* Selector de dispositivo */}
                   <div className="space-y-2">
                     <Label htmlFor="device-type">Tipo de Dispositivo</Label>
@@ -844,7 +863,7 @@ export function SettingsModal() {
                 </div>
               </AccordionTrigger>
               <AccordionContent>
-                <div className="space-y-4 rounded-lg border border-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20 p-4">
+                <div className="space-y-4 rounded-lg border bg-background p-4">
                   {/* Información */}
                   <div className="rounded-md bg-blue-100 p-3 dark:bg-blue-900/30">
                     <p className="text-xs text-blue-800 dark:text-blue-300">
@@ -860,18 +879,19 @@ export function SettingsModal() {
                     </h4>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="wifi-ssid">SSID de la Red</Label>
+                      <Label htmlFor="wifi-ssid" className="text-foreground">SSID de la Red</Label>
                       <Input
                         id="wifi-ssid"
                         placeholder="MiRedWiFi"
                         value={wifiSSID}
                         onChange={(e) => setWifiSSID(e.target.value)}
                         maxLength={32}
+                        className="bg-background"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="wifi-pwd">Contraseña de la Red</Label>
+                      <Label htmlFor="wifi-pwd" className="text-foreground">Contraseña de la Red</Label>
                       <Input
                         id="wifi-pwd"
                         type="password"
@@ -879,6 +899,7 @@ export function SettingsModal() {
                         value={wifiPassword}
                         onChange={(e) => setWifiPassword(e.target.value)}
                         maxLength={64}
+                        className="bg-background"
                       />
                     </div>
 
@@ -895,10 +916,10 @@ export function SettingsModal() {
 
                   <Separator />
 
-                  {/* Comandos pendientes */}
+                  {/* Redes actuales y estado de sincronización */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-semibold">Comandos Pendientes</h4>
+                      <h4 className="text-sm font-semibold">Estado de Redes WiFi</h4>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -913,50 +934,93 @@ export function SettingsModal() {
                       <div className="flex items-center justify-center py-4">
                         <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                       </div>
-                    ) : pendingWifiCommands.length === 0 ? (
-                      <div className="rounded-md border border-dashed p-4 text-center">
-                        <p className="text-sm text-muted-foreground">
-                          No hay comandos pendientes
-                        </p>
-                      </div>
                     ) : (
-                      <div className="space-y-2">
-                        {pendingWifiCommands.map((cmd) => (
-                          <div
-                            key={cmd.id}
-                            className="flex items-center justify-between rounded-md border bg-background p-3"
-                          >
-                            <div className="flex items-center gap-3">
-                              {cmd.action === 'add' ? (
-                                <Plus className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <Trash2 className="h-4 w-4 text-red-600" />
-                              )}
-                              <div>
-                                <p className="text-sm font-medium">
-                                  {cmd.action === 'add' ? 'Agregar' : 'Eliminar'}: {cmd.ssid}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(cmd.createdAt).toLocaleString()}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveWifiCommand(cmd.id)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                      <div className="space-y-3">
+                        {/* Estado de sincronización */}
+                        {wifiInSync !== null && (
+                          <div className={`rounded-md p-3 ${wifiInSync ? 'bg-green-50 border border-green-200 dark:bg-green-950/20 dark:border-green-900/30' : 'bg-orange-50 border border-orange-200 dark:bg-orange-950/20 dark:border-orange-900/30'}`}>
+                            <p className={`text-xs font-medium ${wifiInSync ? 'text-green-800 dark:text-green-300' : 'text-orange-800 dark:text-orange-300'}`}>
+                              {wifiInSync ? '✅ Sincronizado' : '⚠️ Desincronizado - Se sincronizará en el próximo reporte'}
+                            </p>
                           </div>
-                        ))}
+                        )}
+
+                        {/* Redes actuales en el ESP32 */}
+                        <div className="rounded-lg border bg-background/50 p-3">
+                          <p className="mb-2 text-xs font-semibold text-muted-foreground">Redes en el ESP32 ({currentNetworks.length})</p>
+                          {currentNetworks.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">Sin redes reportadas</p>
+                          ) : (
+                            <div className="space-y-1">
+                              {currentNetworks.map((ssid, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <Wifi className="h-3 w-3 text-blue-600" />
+                                  <span className="text-sm font-mono">{ssid}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Redes deseadas (master list) */}
+                        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+                          <p className="mb-2 text-xs font-semibold text-primary">Redes Configuradas ({desiredNetworks.length})</p>
+                          {desiredNetworks.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">Sin redes configuradas</p>
+                          ) : (
+                            <div className="space-y-1">
+                              {desiredNetworks.map((network, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <Wifi className="h-3 w-3 text-primary" />
+                                  <span className="text-sm font-mono">{network.ssid}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Comandos pendientes */}
+                        {pendingWifiCommands.length > 0 && (
+                          <div className="rounded-lg border border-amber-300 bg-amber-50/50 dark:bg-amber-950/20 p-3">
+                            <p className="mb-2 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                              Comandos Pendientes ({pendingWifiCommands.length})
+                            </p>
+                            <div className="space-y-2">
+                              {pendingWifiCommands.map((cmd) => (
+                                <div
+                                  key={cmd.id}
+                                  className="flex items-center justify-between rounded-md border bg-background p-2"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {cmd.action === 'add' ? (
+                                      <Plus className="h-3 w-3 text-green-600" />
+                                    ) : (
+                                      <Trash2 className="h-3 w-3 text-red-600" />
+                                    )}
+                                    <p className="text-xs font-medium">
+                                      {cmd.action === 'add' ? 'Agregar' : 'Eliminar'}: {cmd.ssid}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveWifiCommand(cmd.id)}
+                                    className="h-6 w-6 p-0"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
 
                   <div className="rounded-md bg-amber-50 p-3 dark:bg-amber-950/20">
                     <p className="text-xs text-amber-800 dark:text-amber-400">
-                      ⚠️ <strong>Nota:</strong> Los comandos se envían automáticamente al ESP32 en su próximo reporte de batería. Máximo 10 redes configurables.
+                      ⚠️ <strong>Nota:</strong> Las redes se sincronizan automáticamente en el próximo reporte del ESP32. Máximo 10 redes configurables.
                     </p>
                   </div>
                 </div>

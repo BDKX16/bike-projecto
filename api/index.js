@@ -4,6 +4,7 @@ const cors = require("cors");
 const BikeData = require("./models/bikeData");
 const Settings = require("./models/settings");
 const WifiCommand = require("./models/wifiCommand");
+const WifiNetwork = require("./models/wifiNetwork");
 const { analyzeBatteryStatus, sendAlertEmail, sendChargeCompleteEmail } = require("./services/alertService");
 const otaService = require("./services/otaService");
 
@@ -77,6 +78,7 @@ app.post("/api/battery", async (req, res) => {
       maxCycles, 
       charging,
       gpioVoltage,
+      wifiNetworks,
       timestamp: espTimestamp 
     } = req.body;
 
@@ -98,11 +100,17 @@ app.post("/api/battery", async (req, res) => {
       maxCycles,
       charging,
       gpioVoltage,
+      wifiNetworks: wifiNetworks || [],
       espTimestamp,
       timestamp: new Date()
     });
     
     await bikeData.save();
+
+    // Log de redes WiFi reportadas
+    if (wifiNetworks && wifiNetworks.length > 0) {
+      console.log(`📡 [WiFi] ${device} reporta ${wifiNetworks.length} redes: ${wifiNetworks.join(', ')}`);
+    }
 
     let emailSent = false;
 
@@ -194,15 +202,37 @@ app.post("/api/battery", async (req, res) => {
         console.log(`⚠️ [OTA] Dispositivo ${device} no envió firmwareVersion`);
       }
       
-      // Verificar comandos WiFi pendientes
+      // ==================== SINCRONIZACIÓN AUTOMÁTICA DE REDES WiFi ====================
+      const allWifiCommands = [];
+      
+      // 1. Sincronización automática (si el ESP32 reportó redes)
+      if (wifiNetworks) {
+        const syncCommands = await WifiNetwork.syncWithESP32(device, wifiNetworks);
+        
+        if (syncCommands.length > 0) {
+          console.log(`🔄 [WiFi Sync] ${syncCommands.length} diferencia(s) detectada(s):`);
+          syncCommands.forEach(cmd => {
+            console.log(`  ${cmd.action === 'add' ? '➕' : '➖'} [Sync] ${cmd.action}: ${cmd.ssid} (${cmd.reason})`);
+          });
+          
+          // Agregar comandos de sincronización a la lista
+          allWifiCommands.push(...syncCommands.map(cmd => ({
+            action: cmd.action,
+            ssid: cmd.ssid,
+            password: cmd.password
+          })));
+        } else {
+          console.log(`✅ [WiFi Sync] Redes sincronizadas correctamente`);
+        }
+      }
+      
+      // 2. Comandos manuales pendientes (agregados desde el panel)
       const pendingWifiCommands = await WifiCommand.getPendingCommands(device);
-      const wifiResponse = {};
       
       if (pendingWifiCommands.length > 0) {
-        console.log(`📡 [WiFi] ${pendingWifiCommands.length} comandos pendientes para ${device}`);
+        console.log(`📡 [WiFi Manual] ${pendingWifiCommands.length} comandos manuales pendientes:`);
         
-        // Formato múltiple (recomendado)
-        wifiResponse.wifiCommands = pendingWifiCommands.map(cmd => {
+        pendingWifiCommands.forEach(cmd => {
           const command = {
             action: cmd.action
           };
@@ -210,21 +240,28 @@ app.post("/api/battery", async (req, res) => {
           if (cmd.action === 'add') {
             command.ssid = cmd.ssid;
             command.password = cmd.password;
-            console.log(`  ➕ [WiFi] add: ${cmd.ssid}`);
+            console.log(`  ➕ [Manual] add: ${cmd.ssid}`);
           } else if (cmd.action === 'remove') {
             command.ssid = cmd.ssid;
-            console.log(`  ➖ [WiFi] remove: ${cmd.ssid}`);
+            console.log(`  ➖ [Manual] remove: ${cmd.ssid}`);
           } else if (cmd.action === 'list') {
-            console.log(`  📋 [WiFi] list`);
+            console.log(`  📋 [Manual] list`);
           }
           
-          return command;
+          allWifiCommands.push(command);
         });
         
-        // Marcar comandos como procesados
+        // Marcar comandos manuales como procesados
         const commandIds = pendingWifiCommands.map(cmd => cmd._id);
         await WifiCommand.markAsProcessed(commandIds);
-        console.log(`✅ [WiFi] Comandos marcados como procesados`);
+        console.log(`✅ [WiFi Manual] Comandos marcados como procesados`);
+      }
+      
+      // 3. Preparar respuesta con todos los comandos (sync + manuales)
+      const wifiResponse = {};
+      if (allWifiCommands.length > 0) {
+        wifiResponse.wifiCommands = allWifiCommands;
+        console.log(`📤 [WiFi] Enviando ${allWifiCommands.length} comando(s) total al ESP32`);
       }
       
       return res.status(201).json({ 
@@ -254,14 +291,36 @@ app.post("/api/battery", async (req, res) => {
       console.log(`⚠️ [OTA] Dispositivo ${device} no envió firmwareVersion`);
     }
 
-    // Verificar comandos WiFi pendientes (también al cargar)
+    // ==================== SINCRONIZACIÓN AUTOMÁTICA DE REDES WiFi (CARGANDO) ====================
+    const allWifiCommands = [];
+    
+    // 1. Sincronización automática
+    if (wifiNetworks) {
+      const syncCommands = await WifiNetwork.syncWithESP32(device, wifiNetworks);
+      
+      if (syncCommands.length > 0) {
+        console.log(`🔄 [WiFi Sync] ${syncCommands.length} diferencia(s) detectada(s) (cargando):`);
+        syncCommands.forEach(cmd => {
+          console.log(`  ${cmd.action === 'add' ? '➕' : '➖'} [Sync] ${cmd.action}: ${cmd.ssid} (${cmd.reason})`);
+        });
+        
+        allWifiCommands.push(...syncCommands.map(cmd => ({
+          action: cmd.action,
+          ssid: cmd.ssid,
+          password: cmd.password
+        })));
+      } else {
+        console.log(`✅ [WiFi Sync] Redes sincronizadas correctamente (cargando)`);
+      }
+    }
+    
+    // 2. Comandos manuales pendientes
     const pendingWifiCommands = await WifiCommand.getPendingCommands(device);
-    const wifiResponse = {};
     
     if (pendingWifiCommands.length > 0) {
-      console.log(`📡 [WiFi] ${pendingWifiCommands.length} comandos pendientes para ${device}`);
+      console.log(`📡 [WiFi Manual] ${pendingWifiCommands.length} comandos manuales pendientes (cargando):`);
       
-      wifiResponse.wifiCommands = pendingWifiCommands.map(cmd => {
+      pendingWifiCommands.forEach(cmd => {
         const command = {
           action: cmd.action
         };
@@ -269,20 +328,27 @@ app.post("/api/battery", async (req, res) => {
         if (cmd.action === 'add') {
           command.ssid = cmd.ssid;
           command.password = cmd.password;
-          console.log(`  ➕ [WiFi] add: ${cmd.ssid}`);
+          console.log(`  ➕ [Manual] add: ${cmd.ssid}`);
         } else if (cmd.action === 'remove') {
           command.ssid = cmd.ssid;
-          console.log(`  ➖ [WiFi] remove: ${cmd.ssid}`);
+          console.log(`  ➖ [Manual] remove: ${cmd.ssid}`);
         } else if (cmd.action === 'list') {
-          console.log(`  📋 [WiFi] list`);
+          console.log(`  📋 [Manual] list`);
         }
         
-        return command;
+        allWifiCommands.push(command);
       });
       
       const commandIds = pendingWifiCommands.map(cmd => cmd._id);
       await WifiCommand.markAsProcessed(commandIds);
-      console.log(`✅ [WiFi] Comandos marcados como procesados`);
+      console.log(`✅ [WiFi Manual] Comandos marcados como procesados`);
+    }
+
+    // 3. Preparar respuesta con todos los comandos
+    const wifiResponse = {};
+    if (allWifiCommands.length > 0) {
+      wifiResponse.wifiCommands = allWifiCommands;
+      console.log(`📤 [WiFi] Enviando ${allWifiCommands.length} comando(s) total al ESP32 (cargando)`);
     }
 
     res.status(201).json({ 
@@ -770,6 +836,15 @@ app.post('/api/wifi/command', async (req, res) => {
       wifiPassword || null
     );
 
+    // Actualizar la lista de redes deseadas (WifiNetwork)
+    if (action === 'add') {
+      await WifiNetwork.upsertNetwork(device, ssid, wifiPassword);
+      console.log(`📡 [WiFi] Red "${ssid}" agregada a lista deseada para ${device}`);
+    } else if (action === 'remove') {
+      await WifiNetwork.removeNetwork(device, ssid);
+      console.log(`📡 [WiFi] Red "${ssid}" eliminada de lista deseada para ${device}`);
+    }
+
     console.log(`📡 [WiFi] Comando creado: ${action} ${ssid || ''} para ${device}`);
 
     res.json({
@@ -977,6 +1052,54 @@ app.delete('/api/wifi/command/:id', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// GET - Obtener redes WiFi actuales del dispositivo (último reporte + redes deseadas)
+app.get('/api/wifi/networks/:device', async (req, res) => {
+  try {
+    const { device } = req.params;
+
+    if (!device) {
+      return res.status(400).json({
+        success: false,
+        error: "Parámetro requerido: device"
+      });
+    }
+
+    // Obtener último reporte del ESP32
+    const latestData = await BikeData.findOne({ device })
+      .sort({ timestamp: -1 })
+      .lean();
+
+    // Obtener redes deseadas (master list)
+    const desiredNetworks = await WifiNetwork.getDesiredNetworks(device);
+
+    res.json({
+      success: true,
+      data: {
+        device,
+        currentNetworks: latestData?.wifiNetworks || [],
+        desiredNetworks: desiredNetworks.map(n => ({
+          ssid: n.ssid,
+          addedAt: n.createdAt
+        })),
+        lastReportTimestamp: latestData?.timestamp || null,
+        inSync: latestData?.wifiNetworks 
+          ? areNetworksSynced(latestData.wifiNetworks, desiredNetworks.map(n => n.ssid))
+          : null
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener redes WiFi:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Helper function para verificar si las redes están sincronizadas
+function areNetworksSynced(currentNetworks, desiredSSIDs) {
+  if (currentNetworks.length !== desiredSSIDs.length) return false;
+  return currentNetworks.every(ssid => desiredSSIDs.includes(ssid)) &&
+         desiredSSIDs.every(ssid => currentNetworks.includes(ssid));
+}
 
 // Server
 const PORT = process.env.API_PORT || 3001;
