@@ -33,6 +33,10 @@ function fillGaps(data: BatteryHistoryData[]): BatteryHistoryData[] {
     intervals.push(intervalTime)
   }
 
+  // Obtener el último dato disponible (más reciente)
+  const lastData = data[data.length - 1]
+  const lastDataTime = new Date(lastData.timestamp)
+  
   let dataIndex = 0
   let lastKnownData: BatteryHistoryData = data[0]
 
@@ -53,7 +57,13 @@ function fillGaps(data: BatteryHistoryData[]): BatteryHistoryData[] {
       }
     }
 
-    // Agregar el dato (sea real o copiado)
+    // Si no hay datos más recientes que este intervalo, usar el último dato disponible
+    // Esto extiende el último valor hasta el presente
+    if (intervalTime > lastDataTime) {
+      closestData = lastData
+    }
+
+    // Agregar el dato (sea real o extendido)
     result.push({
       ...closestData,
       time: intervalTime.toLocaleTimeString("es-AR", { 
