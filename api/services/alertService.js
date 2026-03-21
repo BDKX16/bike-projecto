@@ -6,7 +6,8 @@ const ALERT_COOLDOWN = {
   'CRÍTICO': 2,      // 2 horas para alertas críticas
   'URGENTE': 4,      // 4 horas para urgentes
   'ADVERTENCIA': 12, // 12 horas para advertencias
-  'charge_complete': 24 // 24 horas para carga completa
+  'charge_complete': 24, // 24 horas para carga completa
+  'charge_started': 6     // 6 horas para inicio de carga
 };
 
 // Configurar transportador de email
@@ -388,8 +389,136 @@ async function sendChargeCompleteEmail(data, settings = null) {
   }
 }
 
+// Enviar email de inicio de carga con estimado de tiempo
+async function sendChargeStartedEmail(data, settings = null) {
+  // Si hay configuración, verificar si está habilitado
+  if (settings && !settings.emailNotifications?.enabled) {
+    console.log('📧 Emails de notificación deshabilitados en configuración');
+    return null;
+  }
+
+  if (settings && !settings.emailNotifications?.chargeStartedAlert?.enabled) {
+    console.log('📧 Alerta de inicio de carga deshabilitada en configuración');
+    return null;
+  }
+
+  // Verificar throttling para inicio de carga (6 horas mínimo entre alertas)
+  const canSend = await canSendAlert('charge_started');
+  if (!canSend) {
+    console.log(`⏸️ Alerta de inicio de carga en cooldown. No se envía email.`);
+    return null;
+  }
+
+  const { device, voltage, percent, current, remainingAh, cycles } = data;
+
+  // Calcular tiempo estimado de carga
+  // Fórmula: Tiempo (horas) = Capacidad restante (Ah) / Corriente de carga (A)
+  // Capacidad total de batería 10s3p ≈ 7.5Ah (2500mAh x 3 = 7500mAh)
+  const totalCapacityAh = 7.5;
+  const currentPercent = percent;
+  const remainingPercent = 100 - currentPercent;
+  const remainingCapacity = (remainingPercent / 100) * totalCapacityAh;
+  
+  // Corriente de carga (valor absoluto, ya que el sensor puede reportarla como negativa)
+  const chargingCurrent = Math.abs(current);
+  
+  // Calcular tiempo en horas (con factor de eficiencia 0.85)
+  const estimatedHours = chargingCurrent > 0.1 
+    ? (remainingCapacity / chargingCurrent) * 1.15  // Factor 1.15 por ineficiencias
+    : 0;
+  
+  // Convertir a horas y minutos
+  const hours = Math.floor(estimatedHours);
+  const minutes = Math.round((estimatedHours - hours) * 60);
+  
+  let timeEstimate = '';
+  if (estimatedHours < 0.1) {
+    timeEstimate = 'Carga casi completa';
+  } else if (hours === 0) {
+    timeEstimate = `${minutes} minutos`;
+  } else if (hours === 1) {
+    timeEstimate = minutes > 0 ? `1 hora ${minutes} minutos` : '1 hora';
+  } else {
+    timeEstimate = minutes > 0 ? `${hours} horas ${minutes} minutos` : `${hours} horas`;
+  }
+
+  const subject = `🔌 Inicio de Carga - ${device}`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #2563eb;">🔌 Inicio de Carga Detectado</h2>
+      
+      <div style="background: #dbeafe; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2563eb;">
+        <p style="margin: 0; font-size: 18px;">Tu batería ha comenzado a cargar</p>
+      </div>
+
+      <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <h3 style="margin-top: 0;">Estado Actual</h3>
+        <table style="width: 100%;">
+          <tr><td><strong>Dispositivo:</strong></td><td>${device}</td></tr>
+          <tr><td><strong>Voltaje:</strong></td><td>${voltage.toFixed(2)}V</td></tr>
+          <tr><td><strong>Nivel actual:</strong></td><td>${percent.toFixed(1)}%</td></tr>
+          <tr><td><strong>Corriente de carga:</strong></td><td>${chargingCurrent.toFixed(2)}A</td></tr>
+          <tr><td><strong>Capacidad restante:</strong></td><td>${remainingCapacity.toFixed(2)}Ah</td></tr>
+          <tr><td><strong>Ciclos:</strong></td><td>${cycles}</td></tr>
+        </table>
+      </div>
+
+      <div style="background: #d1fae5; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #059669;">
+        <h3 style="margin-top: 0; color: #059669;">⏱️ Tiempo Estimado de Carga</h3>
+        <p style="margin: 5px 0; font-size: 24px; font-weight: bold; color: #047857;">${timeEstimate}</p>
+        <p style="margin: 5px 0; font-size: 12px; color: #065f46;">
+          ${chargingCurrent > 0.1 
+            ? `Con una corriente de ${chargingCurrent.toFixed(2)}A, se estima alcanzar el 100% en aproximadamente ${timeEstimate}`
+            : 'Corriente de carga muy baja o estabilizándose'}
+        </p>
+      </div>
+
+      <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <h4 style="margin-top: 0; color: #92400e;">💡 Consejos de Carga:</h4>
+        <ul style="margin: 10px 0; padding-left: 20px; color: #78350f;">
+          <li>La carga rápida puede disminuir ligeramente la vida útil de la batería</li>
+          <li>Para uso diario, no es necesario cargar hasta el 100%</li>
+          <li>El rango 20%-80% es ideal para maximizar la longevidad</li>
+          <li>Evita interrumpir la carga frecuentemente</li>
+          <li>Verifica que el voltaje no supere 42V (4.2V/celda)</li>
+        </ul>
+      </div>
+
+      <p style="margin-top: 20px; color: #6b7280; font-size: 12px;">
+        Este email fue generado automáticamente por el sistema de monitoreo de Bike Projecto.<br>
+        Fecha: ${new Date().toLocaleString('es-ES', { timeZone: 'America/Argentina/Buenos_Aires' })}
+      </p>
+    </div>
+  `;
+
+  // Usar el email de la configuración si está disponible, sino usar el de .env
+  const recipientEmail = settings?.emailNotifications?.email || process.env.ALERT_EMAIL;
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: recipientEmail,
+    subject,
+    html
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✉️ Email de inicio de carga enviado a ${recipientEmail}: ${info.messageId}`);
+    
+    // Registrar que se envió la alerta
+    await logAlert('charge_started');
+    
+    return info;
+  } catch (error) {
+    console.error('❌ Error enviando email de inicio de carga:', error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   analyzeBatteryStatus,
   sendAlertEmail,
-  sendChargeCompleteEmail
+  sendChargeCompleteEmail,
+  sendChargeStartedEmail
 };

@@ -4,7 +4,7 @@ const cors = require("cors");
 const BikeData = require("./models/bikeData");
 const Settings = require("./models/settings");
 const WifiNetwork = require("./models/wifiNetwork");
-const { analyzeBatteryStatus, sendAlertEmail, sendChargeCompleteEmail } = require("./services/alertService");
+const { analyzeBatteryStatus, sendAlertEmail, sendChargeCompleteEmail, sendChargeStartedEmail } = require("./services/alertService");
 const otaService = require("./services/otaService");
 
 require("dotenv").config();
@@ -112,6 +112,17 @@ app.post("/api/battery", async (req, res) => {
     }
 
     let emailSent = false;
+
+    // Detectar inicio de carga (transición de no cargando a cargando)
+    if (charging && previousData && !previousData.charging) {
+      try {
+        await sendChargeStartedEmail(req.body, settings);
+        console.log(`🔌 Inicio de carga detectado. Email enviado con estimación.`);
+        emailSent = true;
+      } catch (emailError) {
+        console.error('Error al enviar email de inicio de carga:', emailError.message);
+      }
+    }
 
     // Detectar carga completa (solo una vez)
     if (charging && percent >= 99.5) {
@@ -238,6 +249,52 @@ app.post("/api/battery", async (req, res) => {
     }
     
     // Si está cargando, incluir verificación OTA
+    emailSent = false;  // Reset para el branch de charging
+    
+    // Detectar inicio de carga (transición de no cargando a cargando)
+    if (charging && previousData && !previousData.charging) {
+      try {
+        await sendChargeStartedEmail(req.body, settings);
+        console.log(`🔌 Inicio de carga detectado. Email enviado con estimación.`);
+        emailSent = true;
+      } catch (emailError) {
+        console.error('Error al enviar email de inicio de carga:', emailError.message);
+      }
+    }
+    
+    // Detectar carga completa (solo una vez)
+    if (charging && percent >= 99.5) {
+      // Verificar si el registro anterior no estaba al 100%
+      if (!previousData || previousData.percent < 99.5) {
+        try {
+          await sendChargeCompleteEmail(req.body, settings);
+          console.log(`🔋 Carga completa detectada. Email enviado.`);
+          emailSent = true;
+        } catch (emailError) {
+          console.error('Error al enviar email de carga completa:', emailError.message);
+        }
+      } else {
+        console.log(`🔋 Batería al 100% pero ya estaba completa. No se envía email.`);
+      }
+    }
+    
+    // Verificar alertas personalizadas de batería alta
+    percentAlerts.length = 0;  // Reset para el branch de charging
+    
+    // Alerta de batería alta (cuando está cargando)
+    if (charging && settings.emailNotifications?.highBatteryAlert?.enabled) {
+      const threshold = settings.emailNotifications.highBatteryAlert.threshold;
+      if (percent >= threshold && (!previousData || previousData.percent < threshold)) {
+        percentAlerts.push({
+          level: 'INFO',
+          type: 'high_battery',
+          issue: `Batería alcanzó ${threshold}%`,
+          detail: `La batería llegó al ${percent.toFixed(1)}% durante la carga`,
+          action: `Nivel objetivo de ${threshold}% alcanzado`
+        });
+      }
+    }
+    
     let otaUpdate = { updateAvailable: false };
     if (firmwareVersion) {
       console.log(`🔍 [OTA] Verificando actualización para ${device} v${firmwareVersion} (CARGANDO)`);

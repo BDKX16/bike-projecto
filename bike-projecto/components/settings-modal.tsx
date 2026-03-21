@@ -633,45 +633,15 @@ export function SettingsModal() {
               <div className="space-y-1">
                 <Label htmlFor="charge-started">Inicio de carga</Label>
                 <p className="text-xs text-muted-foreground">
-                  Notifica cuando se conecta el cargador (próximamente)
+                  Notifica cuando se conecta el cargador con estimado de tiempo
                 </p>
               </div>
               <Switch
                 id="charge-started"
                 checked={settings.emailNotifications.chargeStartedAlert.enabled}
                 onCheckedChange={(checked) => updateAlertSetting('chargeStartedAlert', 'enabled', checked)}
-                disabled={true}
+                disabled={!settings.emailNotifications.enabled}
               />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Alertas avanzadas (futuras) */}
-          <div className="space-y-4">
-            <h3 className="flex items-center gap-2 font-semibold">
-              <Wifi className="h-4 w-4" />
-              Alertas Avanzadas
-            </h3>
-
-            <div className="flex items-center justify-between rounded-lg border p-3 opacity-50">
-              <div className="space-y-1">
-                <Label htmlFor="temp-alert">Alertas de temperatura</Label>
-                <p className="text-xs text-muted-foreground">
-                  Próximamente: alertas de sobrecalentamiento
-                </p>
-              </div>
-              <Switch id="temp-alert" disabled={true} />
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border p-3 opacity-50">
-              <div className="space-y-1">
-                <Label htmlFor="connection-alert">Pérdida de conexión</Label>
-                <p className="text-xs text-muted-foreground">
-                  Próximamente: avisa si no hay datos por X minutos
-                </p>
-              </div>
-              <Switch id="connection-alert" disabled={true} />
             </div>
           </div>
 
