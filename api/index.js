@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const BikeData = require("./models/bikeData");
 const Settings = require("./models/settings");
+const WifiCommand = require("./models/wifiCommand");
 const { analyzeBatteryStatus, sendAlertEmail, sendChargeCompleteEmail } = require("./services/alertService");
 const otaService = require("./services/otaService");
 
@@ -193,6 +194,39 @@ app.post("/api/battery", async (req, res) => {
         console.log(`⚠️ [OTA] Dispositivo ${device} no envió firmwareVersion`);
       }
       
+      // Verificar comandos WiFi pendientes
+      const pendingWifiCommands = await WifiCommand.getPendingCommands(device);
+      const wifiResponse = {};
+      
+      if (pendingWifiCommands.length > 0) {
+        console.log(`📡 [WiFi] ${pendingWifiCommands.length} comandos pendientes para ${device}`);
+        
+        // Formato múltiple (recomendado)
+        wifiResponse.wifiCommands = pendingWifiCommands.map(cmd => {
+          const command = {
+            action: cmd.action
+          };
+          
+          if (cmd.action === 'add') {
+            command.ssid = cmd.ssid;
+            command.password = cmd.password;
+            console.log(`  ➕ [WiFi] add: ${cmd.ssid}`);
+          } else if (cmd.action === 'remove') {
+            command.ssid = cmd.ssid;
+            console.log(`  ➖ [WiFi] remove: ${cmd.ssid}`);
+          } else if (cmd.action === 'list') {
+            console.log(`  📋 [WiFi] list`);
+          }
+          
+          return command;
+        });
+        
+        // Marcar comandos como procesados
+        const commandIds = pendingWifiCommands.map(cmd => cmd._id);
+        await WifiCommand.markAsProcessed(commandIds);
+        console.log(`✅ [WiFi] Comandos marcados como procesados`);
+      }
+      
       return res.status(201).json({ 
         status: 'ok',
         success: true, 
@@ -200,6 +234,7 @@ app.post("/api/battery", async (req, res) => {
         alerts: alerts.length > 0 ? alerts : undefined,
         emailSent,
         ...otaUpdate,
+        ...wifiResponse,
         receivedAt: new Date().toISOString()
       });
     }
@@ -219,6 +254,37 @@ app.post("/api/battery", async (req, res) => {
       console.log(`⚠️ [OTA] Dispositivo ${device} no envió firmwareVersion`);
     }
 
+    // Verificar comandos WiFi pendientes (también al cargar)
+    const pendingWifiCommands = await WifiCommand.getPendingCommands(device);
+    const wifiResponse = {};
+    
+    if (pendingWifiCommands.length > 0) {
+      console.log(`📡 [WiFi] ${pendingWifiCommands.length} comandos pendientes para ${device}`);
+      
+      wifiResponse.wifiCommands = pendingWifiCommands.map(cmd => {
+        const command = {
+          action: cmd.action
+        };
+        
+        if (cmd.action === 'add') {
+          command.ssid = cmd.ssid;
+          command.password = cmd.password;
+          console.log(`  ➕ [WiFi] add: ${cmd.ssid}`);
+        } else if (cmd.action === 'remove') {
+          command.ssid = cmd.ssid;
+          console.log(`  ➖ [WiFi] remove: ${cmd.ssid}`);
+        } else if (cmd.action === 'list') {
+          console.log(`  📋 [WiFi] list`);
+        }
+        
+        return command;
+      });
+      
+      const commandIds = pendingWifiCommands.map(cmd => cmd._id);
+      await WifiCommand.markAsProcessed(commandIds);
+      console.log(`✅ [WiFi] Comandos marcados como procesados`);
+    }
+
     res.status(201).json({ 
       status: 'ok',
       success: true, 
@@ -227,6 +293,7 @@ app.post("/api/battery", async (req, res) => {
       emailSent,
       percentAlerts: percentAlerts.length > 0 ? percentAlerts : undefined,
       ...otaUpdate,
+      ...wifiResponse,
       receivedAt: new Date().toISOString()
     });
   } catch (error) {
@@ -630,6 +697,283 @@ app.get('/api/ota/next-version', async (req, res) => {
     });
   } catch (error) {
     console.error('Error al obtener próxima versión:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ==================== WIFI MANAGEMENT ENDPOINTS ====================
+
+// POST - Agregar comando WiFi (requiere autenticación)
+app.post('/api/wifi/command', async (req, res) => {
+  try {
+    const { password, device, action, ssid, wifiPassword } = req.body;
+    
+    // Verificar contraseña
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ebike2024";
+    
+    if (!password || password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Contraseña incorrecta" 
+      });
+    }
+
+    // Validar parámetros
+    if (!device || !action) {
+      return res.status(400).json({
+        success: false,
+        error: "Parámetros requeridos: device, action"
+      });
+    }
+
+    if (!['add', 'remove', 'list'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        error: "action debe ser 'add', 'remove' o 'list'"
+      });
+    }
+
+    if (action === 'add' && (!ssid || !wifiPassword)) {
+      return res.status(400).json({
+        success: false,
+        error: "Para agregar una red se requiere ssid y password"
+      });
+    }
+
+    if (action === 'remove' && !ssid) {
+      return res.status(400).json({
+        success: false,
+        error: "Para eliminar una red se requiere ssid"
+      });
+    }
+
+    // Validar longitud de SSID y password
+    if (ssid && ssid.length > 32) {
+      return res.status(400).json({
+        success: false,
+        error: "SSID no puede exceder 32 caracteres"
+      });
+    }
+
+    if (wifiPassword && wifiPassword.length > 64) {
+      return res.status(400).json({
+        success: false,
+        error: "Password no puede exceder 64 caracteres"
+      });
+    }
+
+    // Crear comando
+    const command = await WifiCommand.addCommand(
+      device,
+      action,
+      ssid || null,
+      wifiPassword || null
+    );
+
+    console.log(`📡 [WiFi] Comando creado: ${action} ${ssid || ''} para ${device}`);
+
+    res.json({
+      success: true,
+      message: `Comando WiFi "${action}" agregado exitosamente`,
+      data: {
+        id: command._id,
+        device: command.device,
+        action: command.action,
+        ssid: command.ssid,
+        createdAt: command.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Error al agregar comando WiFi:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST - Agregar múltiples comandos WiFi a la vez
+app.post('/api/wifi/commands/batch', async (req, res) => {
+  try {
+    const { password, device, commands } = req.body;
+    
+    // Verificar contraseña
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ebike2024";
+    
+    if (!password || password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Contraseña incorrecta" 
+      });
+    }
+
+    if (!device || !commands || !Array.isArray(commands) || commands.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Parámetros requeridos: device, commands (array)"
+      });
+    }
+
+    const createdCommands = [];
+    const errors = [];
+
+    for (let i = 0; i < commands.length; i++) {
+      const cmd = commands[i];
+      
+      try {
+        // Validación básica
+        if (!cmd.action || !['add', 'remove', 'list'].includes(cmd.action)) {
+          errors.push({ index: i, error: 'action inválido' });
+          continue;
+        }
+
+        if (cmd.action === 'add' && (!cmd.ssid || !cmd.password)) {
+          errors.push({ index: i, error: 'ssid y password requeridos' });
+          continue;
+        }
+
+        if (cmd.action === 'remove' && !cmd.ssid) {
+          errors.push({ index: i, error: 'ssid requerido' });
+          continue;
+        }
+
+        const command = await WifiCommand.addCommand(
+          device,
+          cmd.action,
+          cmd.ssid || null,
+          cmd.password || null
+        );
+
+        createdCommands.push({
+          id: command._id,
+          action: command.action,
+          ssid: command.ssid
+        });
+      } catch (err) {
+        errors.push({ index: i, error: err.message });
+      }
+    }
+
+    console.log(`📡 [WiFi] Batch: ${createdCommands.length} comandos creados para ${device}`);
+
+    res.json({
+      success: true,
+      message: `${createdCommands.length} comandos WiFi agregados`,
+      data: {
+        created: createdCommands,
+        errors: errors.length > 0 ? errors : undefined
+      }
+    });
+  } catch (error) {
+    console.error('Error al agregar comandos WiFi en batch:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET - Obtener comandos WiFi pendientes de un dispositivo
+app.get('/api/wifi/commands/pending', async (req, res) => {
+  try {
+    const { device } = req.query;
+
+    if (!device) {
+      return res.status(400).json({
+        success: false,
+        error: "Parámetro requerido: device"
+      });
+    }
+
+    const pendingCommands = await WifiCommand.getPendingCommands(device);
+
+    res.json({
+      success: true,
+      count: pendingCommands.length,
+      data: pendingCommands.map(cmd => ({
+        id: cmd._id,
+        action: cmd.action,
+        ssid: cmd.ssid,
+        createdAt: cmd.createdAt
+      }))
+    });
+  } catch (error) {
+    console.error('Error al obtener comandos pendientes:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET - Obtener historial de comandos WiFi
+app.get('/api/wifi/commands/history', async (req, res) => {
+  try {
+    const { device, limit = 50 } = req.query;
+
+    if (!device) {
+      return res.status(400).json({
+        success: false,
+        error: "Parámetro requerido: device"
+      });
+    }
+
+    const commands = await WifiCommand.find({ device })
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .lean();
+
+    res.json({
+      success: true,
+      count: commands.length,
+      data: commands.map(cmd => ({
+        id: cmd._id,
+        action: cmd.action,
+        ssid: cmd.ssid,
+        processed: cmd.processed,
+        createdAt: cmd.createdAt,
+        processedAt: cmd.processedAt
+      }))
+    });
+  } catch (error) {
+    console.error('Error al obtener historial de comandos:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// DELETE - Eliminar comando WiFi pendiente (requiere autenticación)
+app.delete('/api/wifi/command/:id', async (req, res) => {
+  try {
+    const { password } = req.body;
+    const { id } = req.params;
+    
+    // Verificar contraseña
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ebike2024";
+    
+    if (!password || password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ 
+        success: false, 
+        error: "Contraseña incorrecta" 
+      });
+    }
+
+    const command = await WifiCommand.findById(id);
+
+    if (!command) {
+      return res.status(404).json({
+        success: false,
+        error: "Comando no encontrado"
+      });
+    }
+
+    if (command.processed) {
+      return res.status(400).json({
+        success: false,
+        error: "No se puede eliminar un comando ya procesado"
+      });
+    }
+
+    await WifiCommand.deleteOne({ _id: id });
+
+    console.log(`🗑️ [WiFi] Comando eliminado: ${command.action} ${command.ssid || ''}`);
+
+    res.json({
+      success: true,
+      message: "Comando eliminado exitosamente"
+    });
+  } catch (error) {
+    console.error('Error al eliminar comando WiFi:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

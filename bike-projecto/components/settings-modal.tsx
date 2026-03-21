@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X, Clock, Upload, Download, Zap } from "lucide-react"
+import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X, Clock, Upload, Download, Zap, Plus, Trash2 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useBatteryData } from "@/hooks/use-battery-data"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
 
 function formatRelativeTime(date: Date): string {
   const now = new Date()
@@ -83,6 +84,12 @@ export function SettingsModal() {
   const [uploadingFirmware, setUploadingFirmware] = useState(false)
   const [nextVersion, setNextVersion] = useState<string>("")
   const [currentVersion, setCurrentVersion] = useState<string>("")
+
+  // Estados para WiFi management
+  const [wifiSSID, setWifiSSID] = useState<string>("")
+  const [wifiPassword, setWifiPassword] = useState<string>("")
+  const [pendingWifiCommands, setPendingWifiCommands] = useState<any[]>([])
+  const [loadingWifiCommands, setLoadingWifiCommands] = useState(false)
 
   // Cargar configuración al abrir el modal
   useEffect(() => {
@@ -210,6 +217,7 @@ export function SettingsModal() {
   useEffect(() => {
     if (deviceType && open) {
       fetchNextVersion()
+      fetchPendingWifiCommands()
     }
   }, [deviceType, open])
 
@@ -319,6 +327,155 @@ export function SettingsModal() {
       })
     } finally {
       setUploadingFirmware(false)
+    }
+  }
+
+  // ==================== WIFI MANAGEMENT FUNCTIONS ====================
+
+  const fetchPendingWifiCommands = async () => {
+    try {
+      setLoadingWifiCommands(true)
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'
+      const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      const endpoint = isDevelopment 
+        ? `${apiUrl}/api/wifi/commands/pending?device=eBikeBattery` 
+        : `/api/wifi/commands/pending?device=eBikeBattery`
+      
+      const response = await fetch(endpoint)
+      const data = await response.json()
+      
+      if (data.success) {
+        setPendingWifiCommands(data.data || [])
+      }
+    } catch (err) {
+      console.error('Error fetching pending WiFi commands:', err)
+    } finally {
+      setLoadingWifiCommands(false)
+    }
+  }
+
+  const handleAddWifiNetwork = async () => {
+    if (!wifiSSID || !wifiPassword) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Por favor ingresa SSID y contraseña",
+      })
+      return
+    }
+
+    if (!password) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Por favor ingresa la contraseña de administrador",
+      })
+      setShowPasswordInput(true)
+      return
+    }
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'
+      const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      const endpoint = isDevelopment ? `${apiUrl}/api/wifi/command` : '/api/wifi/command'
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password,
+          device: 'eBikeBattery',
+          action: 'add',
+          ssid: wifiSSID,
+          wifiPassword: wifiPassword
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "✅ Red WiFi Agregada",
+          description: `La red "${wifiSSID}" se agregará en el próximo reporte del ESP32`,
+          className: "border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100",
+        })
+        
+        // Limpiar formulario
+        setWifiSSID("")
+        setWifiPassword("")
+        
+        // Actualizar lista de pendientes
+        await fetchPendingWifiCommands()
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: data.error || 'Error al agregar red WiFi',
+        })
+      }
+    } catch (err) {
+      console.error('Error adding WiFi network:', err)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Error al conectar con el servidor",
+      })
+    }
+  }
+
+  const handleRemoveWifiCommand = async (commandId: string) => {
+    if (!password) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Por favor ingresa la contraseña de administrador",
+      })
+      setShowPasswordInput(true)
+      return
+    }
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'
+      const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      const endpoint = isDevelopment 
+        ? `${apiUrl}/api/wifi/command/${commandId}` 
+        : `/api/wifi/command/${commandId}`
+
+      const response = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast({
+          title: "✅ Comando Eliminado",
+          description: "El comando WiFi fue eliminado exitosamente",
+          className: "border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100",
+        })
+        
+        // Actualizar lista de pendientes
+        await fetchPendingWifiCommands()
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: data.error || 'Error al eliminar comando',
+        })
+      }
+    } catch (err) {
+      console.error('Error removing WiFi command:', err)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Error al conectar con el servidor",
+      })
     }
   }
 
@@ -569,111 +726,246 @@ export function SettingsModal() {
 
           <Separator />
 
-          {/* Actualización de Firmware OTA */}
-          <div className="space-y-4">
-            <h3 className="flex items-center gap-2 font-semibold">
-              <Zap className="h-4 w-4" />
-              Actualización de Firmware (OTA)
-            </h3>
-
-            <div className="space-y-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
-              {/* Selector de dispositivo */}
-              <div className="space-y-2">
-                <Label htmlFor="device-type">Tipo de Dispositivo</Label>
-                <Select value={deviceType} onValueChange={setDeviceType}>
-                  <SelectTrigger id="device-type">
-                    <SelectValue placeholder="Selecciona dispositivo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="battery">
-                      <div className="flex items-center gap-2">
-                        <Battery className="h-4 w-4" />
-                        <span>Batería (ESP32-C3)</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="mainboard">
-                      <div className="flex items-center gap-2">
-                        <Zap className="h-4 w-4" />
-                        <span>Mainboard (ESP32-S2)</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Información de versiones */}
-              <div className="grid grid-cols-2 gap-3 rounded-md bg-background/50 p-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Versión Actual</p>
-                  <p className="font-mono text-sm font-semibold">{currentVersion || '---'}</p>
+          {/* Secciones Avanzadas - Acordeón */}
+          <Accordion type="multiple" className="w-full">
+            {/* Actualización de Firmware OTA */}
+            <AccordionItem value="ota-firmware">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-2 font-semibold">
+                  <Zap className="h-4 w-4" />
+                  Actualización de Firmware (OTA)
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Próxima Versión</p>
-                  <p className="font-mono text-sm font-semibold text-green-600 dark:text-green-400">
-                    {nextVersion || '---'}
-                  </p>
-                </div>
-              </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                  {/* Selector de dispositivo */}
+                  <div className="space-y-2">
+                    <Label htmlFor="device-type">Tipo de Dispositivo</Label>
+                    <Select value={deviceType} onValueChange={setDeviceType}>
+                      <SelectTrigger id="device-type">
+                        <SelectValue placeholder="Selecciona dispositivo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="battery">
+                          <div className="flex items-center gap-2">
+                            <Battery className="h-4 w-4" />
+                            <span>Batería (ESP32-C3)</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="mainboard">
+                          <div className="flex items-center gap-2">
+                            <Zap className="h-4 w-4" />
+                            <span>Mainboard (ESP32-S2)</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              {/* Selector de archivo */}
-              <div className="space-y-2">
-                <Label htmlFor="firmware-file">Archivo de Firmware (.bin)</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="firmware-file"
-                    type="file"
-                    accept=".bin"
-                    onChange={handleFileChange}
-                    className="cursor-pointer"
-                  />
-                  {firmwareFile && (
-                    <div className="flex items-center gap-1 rounded-md bg-green-50 px-3 text-xs text-green-700 dark:bg-green-950 dark:text-green-400">
-                      <Download className="h-3 w-3" />
-                      {(firmwareFile.size / 1024).toFixed(1)} KB
+                  {/* Información de versiones */}
+                  <div className="grid grid-cols-2 gap-3 rounded-md bg-background/50 p-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Versión Actual</p>
+                      <p className="font-mono text-sm font-semibold">{currentVersion || '---'}</p>
                     </div>
-                  )}
+                    <div>
+                      <p className="text-xs text-muted-foreground">Próxima Versión</p>
+                      <p className="font-mono text-sm font-semibold text-green-600 dark:text-green-400">
+                        {nextVersion || '---'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Selector de archivo */}
+                  <div className="space-y-2">
+                    <Label htmlFor="firmware-file">Archivo de Firmware (.bin)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="firmware-file"
+                        type="file"
+                        accept=".bin"
+                        onChange={handleFileChange}
+                        className="cursor-pointer"
+                      />
+                      {firmwareFile && (
+                        <div className="flex items-center gap-1 rounded-md bg-green-50 px-3 text-xs text-green-700 dark:bg-green-950 dark:text-green-400">
+                          <Download className="h-3 w-3" />
+                          {(firmwareFile.size / 1024).toFixed(1)} KB
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {firmwareFile ? `Seleccionado: ${firmwareFile.name}` : 'Selecciona un archivo .bin compilado'}
+                    </p>
+                  </div>
+
+                  {/* Changelog */}
+                  <div className="space-y-2">
+                    <Label htmlFor="changelog">Notas de la Versión (Opcional)</Label>
+                    <Textarea
+                      id="changelog"
+                      placeholder="Fix de bug en sensor de corriente, mejoras de rendimiento..."
+                      value={changelog}
+                      onChange={(e) => setChangelog(e.target.value)}
+                      rows={3}
+                      className="resize-none"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Describe los cambios de esta actualización
+                    </p>
+                  </div>
+
+                  {/* Botón de subir */}
+                  <Button
+                    onClick={handleFirmwareUpload}
+                    disabled={uploadingFirmware || !firmwareFile}
+                    className="w-full"
+                    variant="default"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {uploadingFirmware ? 'Subiendo...' : `Subir Firmware v${nextVersion}`}
+                  </Button>
+
+                  <div className="rounded-md bg-blue-50 p-3 dark:bg-blue-950/20">
+                    <p className="text-xs text-blue-800 dark:text-blue-400">
+                      ℹ️ El versionado es <strong>autoincremental</strong>. La versión se asigna automáticamente basándose en la última versión registrada (+1 en patch).
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {firmwareFile ? `Seleccionado: ${firmwareFile.name}` : 'Selecciona un archivo .bin compilado'}
-                </p>
-              </div>
+              </AccordionContent>
+            </AccordionItem>
 
-              {/* Changelog */}
-              <div className="space-y-2">
-                <Label htmlFor="changelog">Notas de la Versión (Opcional)</Label>
-                <Textarea
-                  id="changelog"
-                  placeholder="Fix de bug en sensor de corriente, mejoras de rendimiento..."
-                  value={changelog}
-                  onChange={(e) => setChangelog(e.target.value)}
-                  rows={3}
-                  className="resize-none"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Describe los cambios de esta actualización
-                </p>
-              </div>
+            {/* Gestión de Redes WiFi */}
+            <AccordionItem value="wifi-management">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-2 font-semibold">
+                  <Wifi className="h-4 w-4" />
+                  Gestión Remota de Redes WiFi
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 rounded-lg border border-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20 p-4">
+                  {/* Información */}
+                  <div className="rounded-md bg-blue-100 p-3 dark:bg-blue-900/30">
+                    <p className="text-xs text-blue-800 dark:text-blue-300">
+                      📡 <strong>Gestión remota:</strong> Agrega o elimina redes WiFi del ESP32 sin necesidad de reprogramarlo. Los cambios se aplicarán en el próximo reporte de batería.
+                    </p>
+                  </div>
 
-              {/* Botón de subir */}
-              <Button
-                onClick={handleFirmwareUpload}
-                disabled={uploadingFirmware || !firmwareFile}
-                className="w-full"
-                variant="default"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                {uploadingFirmware ? 'Subiendo...' : `Subir Firmware v${nextVersion}`}
-              </Button>
+                  {/* Agregar nueva red */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      Agregar Nueva Red
+                    </h4>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="wifi-ssid">SSID de la Red</Label>
+                      <Input
+                        id="wifi-ssid"
+                        placeholder="MiRedWiFi"
+                        value={wifiSSID}
+                        onChange={(e) => setWifiSSID(e.target.value)}
+                        maxLength={32}
+                      />
+                    </div>
 
-              <div className="rounded-md bg-blue-50 p-3 dark:bg-blue-950/20">
-                <p className="text-xs text-blue-800 dark:text-blue-400">
-                  ℹ️ El versionado es <strong>autoincremental</strong>. La versión se asigna automáticamente basándose en la última versión registrada (+1 en patch).
-                </p>
-              </div>
-            </div>
-          </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="wifi-pwd">Contraseña de la Red</Label>
+                      <Input
+                        id="wifi-pwd"
+                        type="password"
+                        placeholder="•••••••••"
+                        value={wifiPassword}
+                        onChange={(e) => setWifiPassword(e.target.value)}
+                        maxLength={64}
+                      />
+                    </div>
+
+                    <Button
+                      onClick={handleAddWifiNetwork}
+                      disabled={!wifiSSID || !wifiPassword}
+                      className="w-full"
+                      variant="default"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Agregar Red WiFi
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  {/* Comandos pendientes */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold">Comandos Pendientes</h4>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={fetchPendingWifiCommands}
+                        disabled={loadingWifiCommands}
+                      >
+                        {loadingWifiCommands ? 'Cargando...' : 'Actualizar'}
+                      </Button>
+                    </div>
+
+                    {loadingWifiCommands ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                      </div>
+                    ) : pendingWifiCommands.length === 0 ? (
+                      <div className="rounded-md border border-dashed p-4 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          No hay comandos pendientes
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {pendingWifiCommands.map((cmd) => (
+                          <div
+                            key={cmd.id}
+                            className="flex items-center justify-between rounded-md border bg-background p-3"
+                          >
+                            <div className="flex items-center gap-3">
+                              {cmd.action === 'add' ? (
+                                <Plus className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              )}
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {cmd.action === 'add' ? 'Agregar' : 'Eliminar'}: {cmd.ssid}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(cmd.createdAt).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveWifiCommand(cmd.id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-md bg-amber-50 p-3 dark:bg-amber-950/20">
+                    <p className="text-xs text-amber-800 dark:text-amber-400">
+                      ⚠️ <strong>Nota:</strong> Los comandos se envían automáticamente al ESP32 en su próximo reporte de batería. Máximo 10 redes configurables.
+                    </p>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
 
           <Separator />
+
 
           {/* Contraseña y botón de guardar */}
           {showPasswordInput && (
