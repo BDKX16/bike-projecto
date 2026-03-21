@@ -90,8 +90,7 @@ export function SettingsModal() {
   const [wifiPassword, setWifiPassword] = useState<string>("")
   const [currentNetworks, setCurrentNetworks] = useState<string[]>([])
   const [desiredNetworks, setDesiredNetworks] = useState<any[]>([])
-  const [pendingWifiCommands, setPendingWifiCommands] = useState<any[]>([])
-  const [loadingWifiCommands, setLoadingWifiCommands] = useState(false)
+  const [loadingWifiData, setLoadingWifiData] = useState(false)
   const [wifiInSync, setWifiInSync] = useState<boolean | null>(null)
 
   // Cargar configuración al abrir el modal
@@ -220,7 +219,7 @@ export function SettingsModal() {
   useEffect(() => {
     if (deviceType && open) {
       fetchNextVersion()
-      fetchPendingWifiCommands()
+      fetchWifiNetworks()
     }
   }, [deviceType, open])
 
@@ -335,9 +334,9 @@ export function SettingsModal() {
 
   // ==================== WIFI MANAGEMENT FUNCTIONS ====================
 
-  const fetchPendingWifiCommands = async () => {
+  const fetchWifiNetworks = async () => {
     try {
-      setLoadingWifiCommands(true)
+      setLoadingWifiData(true)
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'
       const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost'
       
@@ -354,22 +353,10 @@ export function SettingsModal() {
         setDesiredNetworks(networksData.data.desiredNetworks || [])
         setWifiInSync(networksData.data.inSync)
       }
-      
-      // También obtener comandos pendientes
-      const commandsEndpoint = isDevelopment 
-        ? `${apiUrl}/api/wifi/commands/pending?device=eBikeBattery` 
-        : `/api/wifi/commands/pending?device=eBikeBattery`
-      
-      const commandsResponse = await fetch(commandsEndpoint)
-      const commandsData = await commandsResponse.json()
-      
-      if (commandsData.success) {
-        setPendingWifiCommands(commandsData.data || [])
-      }
     } catch (err) {
       console.error('Error fetching WiFi data:', err)
     } finally {
-      setLoadingWifiCommands(false)
+      setLoadingWifiData(false)
     }
   }
 
@@ -396,7 +383,7 @@ export function SettingsModal() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'
       const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-      const endpoint = isDevelopment ? `${apiUrl}/api/wifi/command` : '/api/wifi/command'
+      const endpoint = isDevelopment ? `${apiUrl}/api/wifi/network` : '/api/wifi/network'
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -406,7 +393,6 @@ export function SettingsModal() {
         body: JSON.stringify({
           password,
           device: 'eBikeBattery',
-          action: 'add',
           ssid: wifiSSID,
           wifiPassword: wifiPassword
         })
@@ -425,8 +411,8 @@ export function SettingsModal() {
         setWifiSSID("")
         setWifiPassword("")
         
-        // Actualizar lista de pendientes
-        await fetchPendingWifiCommands()
+        // Actualizar lista de redes
+        await fetchWifiNetworks()
       } else {
         toast({
           variant: "destructive",
@@ -436,60 +422,6 @@ export function SettingsModal() {
       }
     } catch (err) {
       console.error('Error adding WiFi network:', err)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Error al conectar con el servidor",
-      })
-    }
-  }
-
-  const handleRemoveWifiCommand = async (commandId: string) => {
-    if (!password) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Por favor ingresa la contraseña de administrador",
-      })
-      setShowPasswordInput(true)
-      return
-    }
-
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3120'
-      const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-      const endpoint = isDevelopment 
-        ? `${apiUrl}/api/wifi/command/${commandId}` 
-        : `/api/wifi/command/${commandId}`
-
-      const response = await fetch(endpoint, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ password })
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast({
-          title: "✅ Comando Eliminado",
-          description: "El comando WiFi fue eliminado exitosamente",
-          className: "border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100",
-        })
-        
-        // Actualizar lista de pendientes
-        await fetchPendingWifiCommands()
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: data.error || 'Error al eliminar comando',
-        })
-      }
-    } catch (err) {
-      console.error('Error removing WiFi command:', err)
       toast({
         variant: "destructive",
         title: "Error",
@@ -923,14 +855,14 @@ export function SettingsModal() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={fetchPendingWifiCommands}
-                        disabled={loadingWifiCommands}
+                        onClick={fetchWifiNetworks}
+                        disabled={loadingWifiData}
                       >
-                        {loadingWifiCommands ? 'Cargando...' : 'Actualizar'}
+                        {loadingWifiData ? 'Cargando...' : 'Actualizar'}
                       </Button>
                     </div>
 
-                    {loadingWifiCommands ? (
+                    {loadingWifiData ? (
                       <div className="flex items-center justify-center py-4">
                         <div className="h-6 w-6 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                       </div>
@@ -978,42 +910,6 @@ export function SettingsModal() {
                             </div>
                           )}
                         </div>
-
-                        {/* Comandos pendientes */}
-                        {pendingWifiCommands.length > 0 && (
-                          <div className="rounded-lg border border-amber-300 bg-amber-50/50 dark:bg-amber-950/20 p-3">
-                            <p className="mb-2 text-xs font-semibold text-amber-800 dark:text-amber-300">
-                              Comandos Pendientes ({pendingWifiCommands.length})
-                            </p>
-                            <div className="space-y-2">
-                              {pendingWifiCommands.map((cmd) => (
-                                <div
-                                  key={cmd.id}
-                                  className="flex items-center justify-between rounded-md border bg-background p-2"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    {cmd.action === 'add' ? (
-                                      <Plus className="h-3 w-3 text-green-600" />
-                                    ) : (
-                                      <Trash2 className="h-3 w-3 text-red-600" />
-                                    )}
-                                    <p className="text-xs font-medium">
-                                      {cmd.action === 'add' ? 'Agregar' : 'Eliminar'}: {cmd.ssid}
-                                    </p>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleRemoveWifiCommand(cmd.id)}
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>

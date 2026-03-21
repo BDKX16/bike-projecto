@@ -3,7 +3,6 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const BikeData = require("./models/bikeData");
 const Settings = require("./models/settings");
-const WifiCommand = require("./models/wifiCommand");
 const WifiNetwork = require("./models/wifiNetwork");
 const { analyzeBatteryStatus, sendAlertEmail, sendChargeCompleteEmail } = require("./services/alertService");
 const otaService = require("./services/otaService");
@@ -203,65 +202,27 @@ app.post("/api/battery", async (req, res) => {
       }
       
       // ==================== SINCRONIZACIÓN AUTOMÁTICA DE REDES WiFi ====================
-      const allWifiCommands = [];
+      const wifiResponse = {};
       
-      // 1. Sincronización automática (si el ESP32 reportó redes)
       if (wifiNetworks) {
         const syncCommands = await WifiNetwork.syncWithESP32(device, wifiNetworks);
         
         if (syncCommands.length > 0) {
           console.log(`🔄 [WiFi Sync] ${syncCommands.length} diferencia(s) detectada(s):`);
           syncCommands.forEach(cmd => {
-            console.log(`  ${cmd.action === 'add' ? '➕' : '➖'} [Sync] ${cmd.action}: ${cmd.ssid} (${cmd.reason})`);
+            console.log(`  ${cmd.action === 'add' ? '➕' : '➖'} ${cmd.action}: ${cmd.ssid} (${cmd.reason})`);
           });
           
-          // Agregar comandos de sincronización a la lista
-          allWifiCommands.push(...syncCommands.map(cmd => ({
+          wifiResponse.wifiCommands = syncCommands.map(cmd => ({
             action: cmd.action,
             ssid: cmd.ssid,
             password: cmd.password
-          })));
+          }));
+          
+          console.log(`📤 [WiFi] Enviando ${syncCommands.length} comando(s) de sincronización al ESP32`);
         } else {
           console.log(`✅ [WiFi Sync] Redes sincronizadas correctamente`);
         }
-      }
-      
-      // 2. Comandos manuales pendientes (agregados desde el panel)
-      const pendingWifiCommands = await WifiCommand.getPendingCommands(device);
-      
-      if (pendingWifiCommands.length > 0) {
-        console.log(`📡 [WiFi Manual] ${pendingWifiCommands.length} comandos manuales pendientes:`);
-        
-        pendingWifiCommands.forEach(cmd => {
-          const command = {
-            action: cmd.action
-          };
-          
-          if (cmd.action === 'add') {
-            command.ssid = cmd.ssid;
-            command.password = cmd.password;
-            console.log(`  ➕ [Manual] add: ${cmd.ssid}`);
-          } else if (cmd.action === 'remove') {
-            command.ssid = cmd.ssid;
-            console.log(`  ➖ [Manual] remove: ${cmd.ssid}`);
-          } else if (cmd.action === 'list') {
-            console.log(`  📋 [Manual] list`);
-          }
-          
-          allWifiCommands.push(command);
-        });
-        
-        // Marcar comandos manuales como procesados
-        const commandIds = pendingWifiCommands.map(cmd => cmd._id);
-        await WifiCommand.markAsProcessed(commandIds);
-        console.log(`✅ [WiFi Manual] Comandos marcados como procesados`);
-      }
-      
-      // 3. Preparar respuesta con todos los comandos (sync + manuales)
-      const wifiResponse = {};
-      if (allWifiCommands.length > 0) {
-        wifiResponse.wifiCommands = allWifiCommands;
-        console.log(`📤 [WiFi] Enviando ${allWifiCommands.length} comando(s) total al ESP32`);
       }
       
       return res.status(201).json({ 
@@ -291,64 +252,28 @@ app.post("/api/battery", async (req, res) => {
       console.log(`⚠️ [OTA] Dispositivo ${device} no envió firmwareVersion`);
     }
 
-    // ==================== SINCRONIZACIÓN AUTOMÁTICA DE REDES WiFi (CARGANDO) ====================
-    const allWifiCommands = [];
+    // ==================== SINCRONIZACIÓN AUTOMÁTICA DE REDES WiFi ====================
+    const wifiResponse = {};
     
-    // 1. Sincronización automática
     if (wifiNetworks) {
       const syncCommands = await WifiNetwork.syncWithESP32(device, wifiNetworks);
       
       if (syncCommands.length > 0) {
         console.log(`🔄 [WiFi Sync] ${syncCommands.length} diferencia(s) detectada(s) (cargando):`);
         syncCommands.forEach(cmd => {
-          console.log(`  ${cmd.action === 'add' ? '➕' : '➖'} [Sync] ${cmd.action}: ${cmd.ssid} (${cmd.reason})`);
+          console.log(`  ${cmd.action === 'add' ? '➕' : '➖'} ${cmd.action}: ${cmd.ssid} (${cmd.reason})`);
         });
         
-        allWifiCommands.push(...syncCommands.map(cmd => ({
+        wifiResponse.wifiCommands = syncCommands.map(cmd => ({
           action: cmd.action,
           ssid: cmd.ssid,
           password: cmd.password
-        })));
+        }));
+        
+        console.log(`📤 [WiFi] Enviando ${syncCommands.length} comando(s) de sincronización al ESP32 (cargando)`);
       } else {
         console.log(`✅ [WiFi Sync] Redes sincronizadas correctamente (cargando)`);
       }
-    }
-    
-    // 2. Comandos manuales pendientes
-    const pendingWifiCommands = await WifiCommand.getPendingCommands(device);
-    
-    if (pendingWifiCommands.length > 0) {
-      console.log(`📡 [WiFi Manual] ${pendingWifiCommands.length} comandos manuales pendientes (cargando):`);
-      
-      pendingWifiCommands.forEach(cmd => {
-        const command = {
-          action: cmd.action
-        };
-        
-        if (cmd.action === 'add') {
-          command.ssid = cmd.ssid;
-          command.password = cmd.password;
-          console.log(`  ➕ [Manual] add: ${cmd.ssid}`);
-        } else if (cmd.action === 'remove') {
-          command.ssid = cmd.ssid;
-          console.log(`  ➖ [Manual] remove: ${cmd.ssid}`);
-        } else if (cmd.action === 'list') {
-          console.log(`  📋 [Manual] list`);
-        }
-        
-        allWifiCommands.push(command);
-      });
-      
-      const commandIds = pendingWifiCommands.map(cmd => cmd._id);
-      await WifiCommand.markAsProcessed(commandIds);
-      console.log(`✅ [WiFi Manual] Comandos marcados como procesados`);
-    }
-
-    // 3. Preparar respuesta con todos los comandos
-    const wifiResponse = {};
-    if (allWifiCommands.length > 0) {
-      wifiResponse.wifiCommands = allWifiCommands;
-      console.log(`📤 [WiFi] Enviando ${allWifiCommands.length} comando(s) total al ESP32 (cargando)`);
     }
 
     res.status(201).json({ 
@@ -769,10 +694,10 @@ app.get('/api/ota/next-version', async (req, res) => {
 
 // ==================== WIFI MANAGEMENT ENDPOINTS ====================
 
-// POST - Agregar comando WiFi (requiere autenticación)
-app.post('/api/wifi/command', async (req, res) => {
+// POST - Agregar red WiFi a lista deseada (requiere autenticación)
+app.post('/api/wifi/network', async (req, res) => {
   try {
-    const { password, device, action, ssid, wifiPassword } = req.body;
+    const { password, device, ssid, wifiPassword } = req.body;
     
     // Verificar contraseña
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ebike2024";
@@ -785,233 +710,54 @@ app.post('/api/wifi/command', async (req, res) => {
     }
 
     // Validar parámetros
-    if (!device || !action) {
+    if (!device || !ssid || !wifiPassword) {
       return res.status(400).json({
         success: false,
-        error: "Parámetros requeridos: device, action"
+        error: "Parámetros requeridos: device, ssid, wifiPassword"
       });
     }
 
-    if (!['add', 'remove', 'list'].includes(action)) {
-      return res.status(400).json({
-        success: false,
-        error: "action debe ser 'add', 'remove' o 'list'"
-      });
-    }
-
-    if (action === 'add' && (!ssid || !wifiPassword)) {
-      return res.status(400).json({
-        success: false,
-        error: "Para agregar una red se requiere ssid y password"
-      });
-    }
-
-    if (action === 'remove' && !ssid) {
-      return res.status(400).json({
-        success: false,
-        error: "Para eliminar una red se requiere ssid"
-      });
-    }
-
-    // Validar longitud de SSID y password
-    if (ssid && ssid.length > 32) {
+    // Validar longitud
+    if (ssid.length > 32) {
       return res.status(400).json({
         success: false,
         error: "SSID no puede exceder 32 caracteres"
       });
     }
 
-    if (wifiPassword && wifiPassword.length > 64) {
+    if (wifiPassword.length > 64) {
       return res.status(400).json({
         success: false,
         error: "Password no puede exceder 64 caracteres"
       });
     }
 
-    // Crear comando
-    const command = await WifiCommand.addCommand(
-      device,
-      action,
-      ssid || null,
-      wifiPassword || null
-    );
-
-    // Actualizar la lista de redes deseadas (WifiNetwork)
-    if (action === 'add') {
-      await WifiNetwork.upsertNetwork(device, ssid, wifiPassword);
-      console.log(`📡 [WiFi] Red "${ssid}" agregada a lista deseada para ${device}`);
-    } else if (action === 'remove') {
-      await WifiNetwork.removeNetwork(device, ssid);
-      console.log(`📡 [WiFi] Red "${ssid}" eliminada de lista deseada para ${device}`);
-    }
-
-    console.log(`📡 [WiFi] Comando creado: ${action} ${ssid || ''} para ${device}`);
-
-    res.json({
-      success: true,
-      message: `Comando WiFi "${action}" agregado exitosamente`,
-      data: {
-        id: command._id,
-        device: command.device,
-        action: command.action,
-        ssid: command.ssid,
-        createdAt: command.createdAt
-      }
-    });
-  } catch (error) {
-    console.error('Error al agregar comando WiFi:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// POST - Agregar múltiples comandos WiFi a la vez
-app.post('/api/wifi/commands/batch', async (req, res) => {
-  try {
-    const { password, device, commands } = req.body;
+    // Agregar/actualizar red en lista deseada
+    const network = await WifiNetwork.upsertNetwork(device, ssid, wifiPassword);
     
-    // Verificar contraseña
-    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ebike2024";
-    
-    if (!password || password !== ADMIN_PASSWORD) {
-      return res.status(401).json({ 
-        success: false, 
-        error: "Contraseña incorrecta" 
-      });
-    }
-
-    if (!device || !commands || !Array.isArray(commands) || commands.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "Parámetros requeridos: device, commands (array)"
-      });
-    }
-
-    const createdCommands = [];
-    const errors = [];
-
-    for (let i = 0; i < commands.length; i++) {
-      const cmd = commands[i];
-      
-      try {
-        // Validación básica
-        if (!cmd.action || !['add', 'remove', 'list'].includes(cmd.action)) {
-          errors.push({ index: i, error: 'action inválido' });
-          continue;
-        }
-
-        if (cmd.action === 'add' && (!cmd.ssid || !cmd.password)) {
-          errors.push({ index: i, error: 'ssid y password requeridos' });
-          continue;
-        }
-
-        if (cmd.action === 'remove' && !cmd.ssid) {
-          errors.push({ index: i, error: 'ssid requerido' });
-          continue;
-        }
-
-        const command = await WifiCommand.addCommand(
-          device,
-          cmd.action,
-          cmd.ssid || null,
-          cmd.password || null
-        );
-
-        createdCommands.push({
-          id: command._id,
-          action: command.action,
-          ssid: command.ssid
-        });
-      } catch (err) {
-        errors.push({ index: i, error: err.message });
-      }
-    }
-
-    console.log(`📡 [WiFi] Batch: ${createdCommands.length} comandos creados para ${device}`);
+    console.log(`📡 [WiFi] Red "${ssid}" agregada/actualizada para ${device}`);
 
     res.json({
       success: true,
-      message: `${createdCommands.length} comandos WiFi agregados`,
+      message: `Red WiFi "${ssid}" agregada exitosamente`,
       data: {
-        created: createdCommands,
-        errors: errors.length > 0 ? errors : undefined
+        id: network._id,
+        device: network.device,
+        ssid: network.ssid,
+        createdAt: network.createdAt
       }
     });
   } catch (error) {
-    console.error('Error al agregar comandos WiFi en batch:', error);
+    console.error('Error al agregar red WiFi:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// GET - Obtener comandos WiFi pendientes de un dispositivo
-app.get('/api/wifi/commands/pending', async (req, res) => {
-  try {
-    const { device } = req.query;
-
-    if (!device) {
-      return res.status(400).json({
-        success: false,
-        error: "Parámetro requerido: device"
-      });
-    }
-
-    const pendingCommands = await WifiCommand.getPendingCommands(device);
-
-    res.json({
-      success: true,
-      count: pendingCommands.length,
-      data: pendingCommands.map(cmd => ({
-        id: cmd._id,
-        action: cmd.action,
-        ssid: cmd.ssid,
-        createdAt: cmd.createdAt
-      }))
-    });
-  } catch (error) {
-    console.error('Error al obtener comandos pendientes:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// GET - Obtener historial de comandos WiFi
-app.get('/api/wifi/commands/history', async (req, res) => {
-  try {
-    const { device, limit = 50 } = req.query;
-
-    if (!device) {
-      return res.status(400).json({
-        success: false,
-        error: "Parámetro requerido: device"
-      });
-    }
-
-    const commands = await WifiCommand.find({ device })
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .lean();
-
-    res.json({
-      success: true,
-      count: commands.length,
-      data: commands.map(cmd => ({
-        id: cmd._id,
-        action: cmd.action,
-        ssid: cmd.ssid,
-        processed: cmd.processed,
-        createdAt: cmd.createdAt,
-        processedAt: cmd.processedAt
-      }))
-    });
-  } catch (error) {
-    console.error('Error al obtener historial de comandos:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// DELETE - Eliminar comando WiFi pendiente (requiere autenticación)
-app.delete('/api/wifi/command/:id', async (req, res) => {
+// DELETE - Eliminar red WiFi de lista deseada (requiere autenticación)
+app.delete('/api/wifi/network/:device/:ssid', async (req, res) => {
   try {
     const { password } = req.body;
-    const { id } = req.params;
+    const { device, ssid } = req.params;
     
     // Verificar contraseña
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "ebike2024";
@@ -1023,32 +769,16 @@ app.delete('/api/wifi/command/:id', async (req, res) => {
       });
     }
 
-    const command = await WifiCommand.findById(id);
+    await WifiNetwork.removeNetwork(device, ssid);
 
-    if (!command) {
-      return res.status(404).json({
-        success: false,
-        error: "Comando no encontrado"
-      });
-    }
-
-    if (command.processed) {
-      return res.status(400).json({
-        success: false,
-        error: "No se puede eliminar un comando ya procesado"
-      });
-    }
-
-    await WifiCommand.deleteOne({ _id: id });
-
-    console.log(`🗑️ [WiFi] Comando eliminado: ${command.action} ${command.ssid || ''}`);
+    console.log(`🗑️ [WiFi] Red "${ssid}" eliminada para ${device}`);
 
     res.json({
       success: true,
-      message: "Comando eliminado exitosamente"
+      message: "Red WiFi eliminada exitosamente"
     });
   } catch (error) {
-    console.error('Error al eliminar comando WiFi:', error);
+    console.error('Error al eliminar red WiFi:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
