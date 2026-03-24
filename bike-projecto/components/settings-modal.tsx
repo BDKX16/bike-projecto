@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X, Clock, Upload, Download, Zap, Plus, Trash2, RefreshCw } from "lucide-react"
+import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X, Clock, Upload, Download, Zap, Plus, Trash2, RefreshCw, CheckCircle2 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -479,12 +479,31 @@ export function SettingsModal({ refetch: refetchBatteryData, isStale, lastUpdate
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => {
-                refetchBatteryData()
+              onClick={async () => {
                 toast({
                   title: "Actualizando datos",
                   description: "Obteniendo los datos más recientes de la batería...",
+                  duration: 6000,
                 })
+                
+                await refetchBatteryData()
+                
+                // Esperar un momento antes de mostrar el toast de confirmación
+                await new Promise(resolve => setTimeout(resolve, 1500))
+                
+                toast({
+                  description: (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-400 shrink-0" />
+                      <div>
+                        <div className="font-semibold">Datos actualizados</div>
+                        <div className="text-sm text-muted-foreground">Los datos de la batería se han actualizado correctamente.</div>
+                      </div>
+                    </div>
+                  ),
+                  duration: 3000,
+                })
+                
                 setOpen(false)
               }}
               className="h-8 w-8 shrink-0 -mt-4 -mr-0.5"
