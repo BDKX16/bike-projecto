@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X, Clock, Upload, Download, Zap, Plus, Trash2 } from "lucide-react"
+import { Settings as SettingsIcon, Mail, Battery, BatteryCharging, Wifi, Lock, Save, X, Clock, Upload, Download, Zap, Plus, Trash2, RefreshCw } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { useBatteryData } from "@/hooks/use-battery-data"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
@@ -68,9 +67,14 @@ interface Settings {
   }
 }
 
-export function SettingsModal() {
+interface SettingsModalProps {
+  refetch: () => void
+  isStale: boolean
+  lastUpdate: Date | null
+}
+
+export function SettingsModal({ refetch: refetchBatteryData, isStale, lastUpdate }: SettingsModalProps) {
   const { toast } = useToast()
-  const { isStale, lastUpdate } = useBatteryData()
   const [open, setOpen] = useState(false)
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(false)
@@ -442,7 +446,7 @@ export function SettingsModal() {
           <SettingsIcon className="h-5 w-5" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {!settings ? (
           <div className="flex items-center justify-center p-8">
             <div className="text-center">
@@ -453,27 +457,47 @@ export function SettingsModal() {
         ) : (
           <>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <SettingsIcon className="h-5 w-5" />
-            Configuración de Notificaciones
-          </DialogTitle>
-          <DialogDescription>
-            Configura las alertas y notificaciones por correo electrónico
-          </DialogDescription>
-          {lastUpdate && (
-            <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs mt-2 w-fit ${isStale ? "bg-orange-500/10 border border-orange-500/30" : "bg-muted"}`}>
-              <Clock className={`h-3 w-3 ${isStale ? "text-orange-400" : "text-muted-foreground"}`} />
-              <span className={`font-mono tracking-wider ${isStale ? "text-orange-400" : "text-muted-foreground"}`}>
-                {formatRelativeTime(lastUpdate)}
-                {isStale && " (sin conexión)"}
-              </span>
+          <div className="flex items-start justify-between pr-5">
+            <div className="flex-1">
+              <DialogTitle className="flex items-center gap-2">
+                <SettingsIcon className="h-5 w-5" />
+                Configuración de Notificaciones
+              </DialogTitle>
+              <DialogDescription>
+                Configura las alertas y notificaciones por correo electrónico
+              </DialogDescription>
+              {lastUpdate && (
+                <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs mt-2 w-fit ${isStale ? "bg-orange-500/10 border border-orange-500/30" : "bg-muted"}`}>
+                  <Clock className={`h-3 w-3 ${isStale ? "text-orange-400" : "text-muted-foreground"}`} />
+                  <span className={`font-mono tracking-wider ${isStale ? "text-orange-400" : "text-muted-foreground"}`}>
+                    {formatRelativeTime(lastUpdate)}
+                    {isStale && " (sin conexión)"}
+                  </span>
+                </div>
+              )}
             </div>
-          )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                refetchBatteryData()
+                toast({
+                  title: "Actualizando datos",
+                  description: "Obteniendo los datos más recientes de la batería...",
+                })
+                setOpen(false)
+              }}
+              className="h-8 w-8 shrink-0 -mt-4 -mr-0.5"
+              title="Actualizar datos de batería"
+            >
+              <RefreshCw className="h-4 w-4 text-foreground/70" />
+            </Button>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div >
           {/* Email principal */}
-          <div className="space-y-4">
+          <div className="pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
@@ -486,169 +510,192 @@ export function SettingsModal() {
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="email">Correo electrónico</Label>
-              <Input
-                id="email"
-                type="email"
-                value={settings.emailNotifications.email}
-                onChange={(e) => updateEmailNotification('email', e.target.value)}
-                placeholder="tu@email.com"
-                disabled={!settings.emailNotifications.enabled}
-              />
+            <div className="grid transition-all duration-500 ease-in-out" style={{ gridTemplateRows: settings.emailNotifications.enabled ? '1fr' : '0fr' }}>
+              <div className="overflow-hidden">
+                <div className="space-y-2 pt-2">
+                  <Label htmlFor="email">Correo electrónico</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={settings.emailNotifications.email}
+                    onChange={(e) => updateEmailNotification('email', e.target.value)}
+                    placeholder="tu@email.com"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
           <Separator />
 
-          {/* Alertas de batería */}
-          <div className="space-y-4">
-            <h3 className="flex items-center gap-2 font-semibold">
-              <Battery className="h-4 w-4" />
-              Alertas de Nivel de Batería
-            </h3>
+          {/* Secciones con Acordeón */}
+          <Accordion type="multiple" className="w-full mb-6">
+            {/* Alertas de Nivel de Batería */}
+            <AccordionItem value="battery-alerts" disabled={!settings.emailNotifications.enabled}>
+              <AccordionTrigger 
+                className={`hover:no-underline ${!settings.emailNotifications.enabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={(e) => {
+                  if (!settings.emailNotifications.enabled) {
+                    e.preventDefault()
+                  }
+                }}
+              >
+                <div className="flex items-center gap-2 font-semibold">
+                  <Battery className="h-4 w-4" />
+                  Alertas de Nivel de Batería
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-3 pt-2">
+                  {/* Batería alta (al cargar) */}
+                  <div className="space-y-2 rounded-lg border p-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="high-battery">Batería alta (al cargar)</Label>
+                      <Switch
+                        id="high-battery"
+                        checked={settings.emailNotifications.highBatteryAlert.enabled}
+                        onCheckedChange={(checked) => updateAlertSetting('highBatteryAlert', 'enabled', checked)}
+                        disabled={!settings.emailNotifications.enabled}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="high-threshold" className="text-sm text-muted-foreground">
+                        Umbral:
+                      </Label>
+                      <Input
+                        id="high-threshold"
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={settings.emailNotifications.highBatteryAlert.threshold}
+                        onChange={(e) => updateAlertSetting('highBatteryAlert', 'threshold', parseInt(e.target.value))}
+                        className="w-20"
+                        disabled={!settings.emailNotifications.highBatteryAlert.enabled}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Avisa cuando la batería alcanza este nivel durante la carga
+                    </p>
+                  </div>
 
-            {/* Batería alta (al cargar) */}
-            <div className="space-y-2 rounded-lg border p-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="high-battery">Batería alta (al cargar)</Label>
-                <Switch
-                  id="high-battery"
-                  checked={settings.emailNotifications.highBatteryAlert.enabled}
-                  onCheckedChange={(checked) => updateAlertSetting('highBatteryAlert', 'enabled', checked)}
-                  disabled={!settings.emailNotifications.enabled}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="high-threshold" className="text-sm text-muted-foreground">
-                  Umbral:
-                </Label>
-                <Input
-                  id="high-threshold"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={settings.emailNotifications.highBatteryAlert.threshold}
-                  onChange={(e) => updateAlertSetting('highBatteryAlert', 'threshold', parseInt(e.target.value))}
-                  className="w-20"
-                  disabled={!settings.emailNotifications.highBatteryAlert.enabled}
-                />
-                <span className="text-sm text-muted-foreground">%</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Avisa cuando la batería alcanza este nivel durante la carga
-              </p>
-            </div>
+                  {/* Batería baja */}
+                  <div className="space-y-2 rounded-lg border p-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="low-battery">Batería baja</Label>
+                      <Switch
+                        id="low-battery"
+                        checked={settings.emailNotifications.lowBatteryAlert.enabled}
+                        onCheckedChange={(checked) => updateAlertSetting('lowBatteryAlert', 'enabled', checked)}
+                        disabled={!settings.emailNotifications.enabled}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="low-threshold" className="text-sm text-muted-foreground">
+                        Umbral:
+                      </Label>
+                      <Input
+                        id="low-threshold"
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={settings.emailNotifications.lowBatteryAlert.threshold}
+                        onChange={(e) => updateAlertSetting('lowBatteryAlert', 'threshold', parseInt(e.target.value))}
+                        className="w-20"
+                        disabled={!settings.emailNotifications.lowBatteryAlert.enabled}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Alerta cuando la batería baja de este nivel
+                    </p>
+                  </div>
 
-            {/* Batería baja */}
-            <div className="space-y-2 rounded-lg border p-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="low-battery">Batería baja</Label>
-                <Switch
-                  id="low-battery"
-                  checked={settings.emailNotifications.lowBatteryAlert.enabled}
-                  onCheckedChange={(checked) => updateAlertSetting('lowBatteryAlert', 'enabled', checked)}
-                  disabled={!settings.emailNotifications.enabled}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="low-threshold" className="text-sm text-muted-foreground">
-                  Umbral:
-                </Label>
-                <Input
-                  id="low-threshold"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={settings.emailNotifications.lowBatteryAlert.threshold}
-                  onChange={(e) => updateAlertSetting('lowBatteryAlert', 'threshold', parseInt(e.target.value))}
-                  className="w-20"
-                  disabled={!settings.emailNotifications.lowBatteryAlert.enabled}
-                />
-                <span className="text-sm text-muted-foreground">%</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Alerta cuando la batería baja de este nivel
-              </p>
-            </div>
+                  {/* Batería crítica */}
+                  <div className="space-y-2 rounded-lg border p-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="critical-battery">Batería crítica</Label>
+                      <Switch
+                        id="critical-battery"
+                        checked={settings.emailNotifications.criticalBatteryAlert.enabled}
+                        onCheckedChange={(checked) => updateAlertSetting('criticalBatteryAlert', 'enabled', checked)}
+                        disabled={!settings.emailNotifications.enabled}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="critical-threshold" className="text-sm text-muted-foreground">
+                        Umbral:
+                      </Label>
+                      <Input
+                        id="critical-threshold"
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={settings.emailNotifications.criticalBatteryAlert.threshold}
+                        onChange={(e) => updateAlertSetting('criticalBatteryAlert', 'threshold', parseInt(e.target.value))}
+                        className="w-20"
+                        disabled={!settings.emailNotifications.criticalBatteryAlert.enabled}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Alerta urgente cuando la batería está críticamente baja
+                    </p>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
 
-            {/* Batería crítica */}
-            <div className="space-y-2 rounded-lg border p-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="critical-battery">Batería crítica</Label>
-                <Switch
-                  id="critical-battery"
-                  checked={settings.emailNotifications.criticalBatteryAlert.enabled}
-                  onCheckedChange={(checked) => updateAlertSetting('criticalBatteryAlert', 'enabled', checked)}
-                  disabled={!settings.emailNotifications.enabled}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="critical-threshold" className="text-sm text-muted-foreground">
-                  Umbral:
-                </Label>
-                <Input
-                  id="critical-threshold"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={settings.emailNotifications.criticalBatteryAlert.threshold}
-                  onChange={(e) => updateAlertSetting('criticalBatteryAlert', 'threshold', parseInt(e.target.value))}
-                  className="w-20"
-                  disabled={!settings.emailNotifications.criticalBatteryAlert.enabled}
-                />
-                <span className="text-sm text-muted-foreground">%</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Alerta urgente cuando la batería está críticamente baja
-              </p>
-            </div>
-          </div>
+            {/* Alertas de Carga */}
+            <AccordionItem value="charge-alerts" disabled={!settings.emailNotifications.enabled}>
+              <AccordionTrigger 
+                className={`hover:no-underline ${!settings.emailNotifications.enabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={(e) => {
+                  if (!settings.emailNotifications.enabled) {
+                    e.preventDefault()
+                  }
+                }}
+              >
+                <div className="flex items-center gap-2 font-semibold">
+                  <BatteryCharging className="h-4 w-4" />
+                  Alertas de Carga
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="charge-complete">Carga completa</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Notifica cuando la batería alcanza el 100%
+                      </p>
+                    </div>
+                    <Switch
+                      id="charge-complete"
+                      checked={settings.emailNotifications.chargeCompleteAlert.enabled}
+                      onCheckedChange={(checked) => updateAlertSetting('chargeCompleteAlert', 'enabled', checked)}
+                      disabled={!settings.emailNotifications.enabled}
+                    />
+                  </div>
 
-          <Separator />
+                  <div className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="charge-started">Inicio de carga</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Notifica cuando se conecta el cargador con estimado de tiempo
+                      </p>
+                    </div>
+                    <Switch
+                      id="charge-started"
+                      checked={settings.emailNotifications.chargeStartedAlert.enabled}
+                      onCheckedChange={(checked) => updateAlertSetting('chargeStartedAlert', 'enabled', checked)}
+                      disabled={!settings.emailNotifications.enabled}
+                    />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
 
-          {/* Alertas de carga */}
-          <div className="space-y-4">
-            <h3 className="flex items-center gap-2 font-semibold">
-              <BatteryCharging className="h-4 w-4" />
-              Alertas de Carga
-            </h3>
-
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div className="space-y-1">
-                <Label htmlFor="charge-complete">Carga completa</Label>
-                <p className="text-xs text-muted-foreground">
-                  Notifica cuando la batería alcanza el 100%
-                </p>
-              </div>
-              <Switch
-                id="charge-complete"
-                checked={settings.emailNotifications.chargeCompleteAlert.enabled}
-                onCheckedChange={(checked) => updateAlertSetting('chargeCompleteAlert', 'enabled', checked)}
-                disabled={!settings.emailNotifications.enabled}
-              />
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border p-3">
-              <div className="space-y-1">
-                <Label htmlFor="charge-started">Inicio de carga</Label>
-                <p className="text-xs text-muted-foreground">
-                  Notifica cuando se conecta el cargador con estimado de tiempo
-                </p>
-              </div>
-              <Switch
-                id="charge-started"
-                checked={settings.emailNotifications.chargeStartedAlert.enabled}
-                onCheckedChange={(checked) => updateAlertSetting('chargeStartedAlert', 'enabled', checked)}
-                disabled={!settings.emailNotifications.enabled}
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Secciones Avanzadas - Acordeón */}
-          <Accordion type="multiple" className="w-full">
             {/* Actualización de Firmware OTA */}
             <AccordionItem value="ota-firmware">
               <AccordionTrigger className="hover:no-underline">
@@ -893,9 +940,6 @@ export function SettingsModal() {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-
-          <Separator />
-
 
           {/* Contraseña y botón de guardar */}
           {showPasswordInput && (

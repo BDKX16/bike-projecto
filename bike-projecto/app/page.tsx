@@ -15,7 +15,7 @@ export default function Home() {
     <main className="relative">
       <BikeFrame />
       <ScrollDarkener />
-      <SettingsModal />
+      <SettingsModal refetch={refetch} isStale={isStale} lastUpdate={lastUpdate} />
       
       <div className="relative z-10">
         {loading ? (
