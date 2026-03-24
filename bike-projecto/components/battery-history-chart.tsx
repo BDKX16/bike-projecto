@@ -195,6 +195,7 @@ export function BatteryHistoryChart({ className = "", isOpen, onOpenChange }: Ba
           <div className="md:hidden">
             <ResponsiveContainer width="100%" height={170}>
               <BarChart data={historyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <YAxis domain={[0, 100]} hide />
                 <Bar 
                   dataKey="percent" 
                   radius={[4, 4, 0, 0]}
@@ -223,6 +224,7 @@ export function BatteryHistoryChart({ className = "", isOpen, onOpenChange }: Ba
           <div className="hidden md:block">
             <ResponsiveContainer width="100%" height={140}>
               <BarChart data={historyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                <YAxis domain={[0, 100]} hide />
                 <Bar 
                   dataKey="percent" 
                   radius={[4, 4, 0, 0]}
